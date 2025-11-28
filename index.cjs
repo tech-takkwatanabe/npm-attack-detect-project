@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Shai-Hulud 侵害パッケージ検査スクリプト（ターゲット指定対応版）
+ * Shai-Hulud 侵害パッケージ検査スクリプト（汎用版）
  * 外部ファイルからパッケージリストを読み込み、指定したディレクトリを検査
+ *
+ * 特徴:
+ * - node_modules (実体およびシンボリックリンク) を検査
+ * - package.json (直接依存) を検査
+ * - ロックファイル非依存 (npm, pnpm, yarn, bun 等に対応)
  *
  * 使用方法:
  *   node index.cjs [ターゲットディレクトリ]
@@ -19,7 +24,7 @@ const TARGET_DIR = args[0] || '.';
 
 // 設定
 const CONFIG = {
-	packageListFile: path.join(__dirname, 'compromised_packages_simple.json'),
+	packageListFile: path.join(__dirname, 'compromised_packages.json'),
 	targetDir: path.resolve(TARGET_DIR),
 	outputFile: null, // 後で設定
 	colors: {
@@ -48,7 +53,7 @@ const log = {
 };
 
 console.log('\n' + '='.repeat(70));
-log.title('🔍 Shai-Hulud 侵害パッケージ検査（ターゲット指定対応版）');
+log.title('🔍 Shai-Hulud 侵害パッケージ検査（汎用版）');
 console.log('='.repeat(70) + '\n');
 
 // ターゲットディレクトリの確認
@@ -71,15 +76,24 @@ if (!fs.statSync(CONFIG.targetDir).isDirectory()) {
 
 console.log('');
 
-// パッケージリストの読み込み
-let COMPROMISED_PACKAGES = [];
+// パッケージリストの読み込み（バージョン情報付き）
+let COMPROMISED_PACKAGES_DATA = null;
+let COMPROMISED_PACKAGES_MAP = new Map(); // パッケージ名 -> バージョンリストのマップ
 
 try {
 	if (fs.existsSync(CONFIG.packageListFile)) {
 		log.info(`📂 パッケージリストを読み込み中: ${path.basename(CONFIG.packageListFile)}`);
 		const data = fs.readFileSync(CONFIG.packageListFile, 'utf8');
-		COMPROMISED_PACKAGES = JSON.parse(data);
-		log.success(`✅ ${COMPROMISED_PACKAGES.length} 個のパッケージを読み込みました\n`);
+		COMPROMISED_PACKAGES_DATA = JSON.parse(data);
+
+		// パッケージ名とバージョンのマップを作成
+		COMPROMISED_PACKAGES_DATA.packages.forEach((pkg) => {
+			// バージョンから 'v' プレフィックスを削除して正規化
+			const normalizedVersions = pkg.versions.map((v) => v.replace(/^v/, ''));
+			COMPROMISED_PACKAGES_MAP.set(pkg.name, normalizedVersions);
+		});
+
+		log.success(`✅ ${COMPROMISED_PACKAGES_MAP.size} 個のパッケージ（バージョン情報付き）を読み込みました\n`);
 	} else {
 		log.error(`❌ エラー: ${CONFIG.packageListFile} が見つかりません`);
 		log.warning(`\n最初に extract_packages.cjs を実行してください:`);
@@ -91,9 +105,25 @@ try {
 	process.exit(1);
 }
 
+/**
+ * パッケージとバージョンが侵害されているかチェック
+ * @param {string} packageName - パッケージ名
+ * @param {string} version - バージョン
+ * @returns {boolean} 侵害されている場合 true
+ */
+function isCompromised(packageName, version) {
+	if (!COMPROMISED_PACKAGES_MAP.has(packageName)) {
+		return false;
+	}
+
+	const compromisedVersions = COMPROMISED_PACKAGES_MAP.get(packageName);
+	const normalizedVersion = version.replace(/^v/, '');
+
+	return compromisedVersions.includes(normalizedVersion);
+}
+
 // 検査対象ファイルのパス
 const paths = {
-	packageLock: path.join(CONFIG.targetDir, 'package-lock.json'),
 	nodeModules: path.join(CONFIG.targetDir, 'node_modules'),
 	packageJson: path.join(CONFIG.targetDir, 'package.json'),
 };
@@ -102,65 +132,20 @@ const paths = {
 const results = {
 	timestamp: new Date().toISOString(),
 	targetDirectory: CONFIG.targetDir,
-	totalChecked: COMPROMISED_PACKAGES.length,
-	foundInPackageLock: [],
+	totalChecked: COMPROMISED_PACKAGES_MAP.size,
 	foundInNodeModules: [],
 	foundInPackageJson: [],
 	summary: {
 		safe: true,
 		totalIssues: 0,
-		criticalLevel: 'none', // none, low, medium, high, critical
+		criticalLevel: 'none', // none, high, critical
 	},
 };
-
-// package-lock.json の検査
-log.title('📦 package-lock.json を検査中...');
-
-if (fs.existsSync(paths.packageLock)) {
-	try {
-		const packageLock = JSON.parse(fs.readFileSync(paths.packageLock, 'utf8'));
-
-		COMPROMISED_PACKAGES.forEach((pkg) => {
-			// dependencies をチェック
-			if (packageLock.dependencies && packageLock.dependencies[pkg]) {
-				const version = packageLock.dependencies[pkg].version;
-				results.foundInPackageLock.push({ package: pkg, version });
-				log.warning(`  ⚠️  ${pkg}@${version}`);
-			}
-
-			// packages をチェック（npm v7+）
-			if (packageLock.packages) {
-				Object.keys(packageLock.packages).forEach((key) => {
-					// node_modules/package または node_modules/@scope/package の形式
-					const keyParts = key.split('node_modules/').pop();
-					if (keyParts === pkg || key.endsWith('/' + pkg)) {
-						const pkgData = packageLock.packages[key];
-						const version = pkgData.version || 'unknown';
-
-						if (!results.foundInPackageLock.find((p) => p.package === pkg)) {
-							results.foundInPackageLock.push({ package: pkg, version });
-							log.warning(`  ⚠️  ${pkg}@${version}`);
-						}
-					}
-				});
-			}
-		});
-
-		if (results.foundInPackageLock.length === 0) {
-			log.success('  ✅ 検出なし');
-		}
-	} catch (error) {
-		log.error(`  ❌ package-lock.json の解析エラー: ${error.message}`);
-	}
-} else {
-	log.warning('  ⚠️  package-lock.json が見つかりません');
-	log.info(`     期待パス: ${paths.packageLock}`);
-}
 
 console.log('');
 
 // node_modules の検査
-log.title('📂 node_modules を検査中（ディレクトリ + package.json の依存関係）...');
+log.title('📂 node_modules を検査中（実体およびシンボリックリンク）...');
 
 /**
  * node_modules 内を再帰的に検索してパッケージを探す
@@ -168,9 +153,10 @@ log.title('📂 node_modules を検査中（ディレクトリ + package.json �
  * @param {string} targetPackage - 検索対象のパッケージ名
  * @param {number} depth - 現在の検索深度（デフォルト: 0）
  * @param {number} maxDepth - 最大検索深度（デフォルト: 5）
+ * @param {Set} visitedPaths - 循環参照防止用のパスセット
  * @returns {Array} 見つかったパッケージの情報配列
  */
-function findPackageRecursively(nodeModulesPath, targetPackage, depth = 0, maxDepth = 5) {
+function findPackageRecursively(nodeModulesPath, targetPackage, depth = 0, maxDepth = 5, visitedPaths = new Set()) {
 	const results = [];
 
 	// 深度制限チェック
@@ -178,53 +164,77 @@ function findPackageRecursively(nodeModulesPath, targetPackage, depth = 0, maxDe
 		return results;
 	}
 
+	// 循環参照チェック
+	try {
+		const realPath = fs.realpathSync(nodeModulesPath);
+		if (visitedPaths.has(realPath)) {
+			return results;
+		}
+		visitedPaths.add(realPath);
+	} catch (e) {
+		// realpath 取得失敗時は続行（ただしリスクあり）
+	}
+
 	try {
 		const entries = fs.readdirSync(nodeModulesPath, { withFileTypes: true });
 
 		for (const entry of entries) {
-			if (!entry.isDirectory()) continue;
+			// ディレクトリまたはシンボリックリンクを対象にする
+			if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
 
 			const entryPath = path.join(nodeModulesPath, entry.name);
 
-			// スコープディレクトリ (@scope) の場合
-			if (entry.name.startsWith('@')) {
+			// スコープディレクトリ (@scope) または .pnpm の場合
+			if (entry.name.startsWith('@') || entry.name === '.pnpm') {
 				try {
 					const scopedEntries = fs.readdirSync(entryPath, {
 						withFileTypes: true,
 					});
 
 					for (const scopedEntry of scopedEntries) {
-						if (!scopedEntry.isDirectory()) continue;
+						if (!scopedEntry.isDirectory() && !scopedEntry.isSymbolicLink()) continue;
 
-						const fullPackageName = `${entry.name}/${scopedEntry.name}`;
+						// .pnpm の直下は package@version 形式のディレクトリだが、
+						// スコープと同じように再帰探索の起点として扱う
 						const packagePath = path.join(entryPath, scopedEntry.name);
 
-						// ターゲットパッケージと一致するか確認
-						if (fullPackageName === targetPackage) {
-							const pkgJsonPath = path.join(packagePath, 'package.json');
-							let version = 'unknown';
+						// .pnpm 内のパッケージの場合、さらにその中の node_modules を探す必要がある
+						// 通常のスコープ (@scope/pkg) とは構造が少し異なるが、
+						// 以下のロジックで汎用的に処理できるか確認
 
-							try {
-								if (fs.existsSync(pkgJsonPath)) {
-									const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
-									version = pkgJson.version || 'unknown';
+						// 1. そのディレクトリ自体がパッケージかチェック (package.jsonがあるか)
+						if (entry.name !== '.pnpm') {
+							// @scope/pkg の場合
+							const fullPackageName = `${entry.name}/${scopedEntry.name}`;
+
+							// ターゲットパッケージと一致するか確認
+							if (fullPackageName === targetPackage) {
+								const pkgJsonPath = path.join(packagePath, 'package.json');
+								let version = 'unknown';
+
+								try {
+									if (fs.existsSync(pkgJsonPath)) {
+										const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+										version = pkgJson.version || 'unknown';
+									}
+								} catch (error) {
+									// package.json の読み込みエラーは無視
 								}
-							} catch (error) {
-								// package.json の読み込みエラーは無視
-							}
 
-							results.push({
-								path: packagePath,
-								version: version,
-								depth: depth,
-								type: 'installed',
-							});
+								results.push({
+									path: packagePath,
+									version: version,
+									depth: depth,
+									type: 'installed',
+								});
+							}
 						}
 
-						// このパッケージの node_modules も再帰的に検索
+						// 2. そのディレクトリの中に node_modules があるかチェック (再帰)
+						// .pnpm/pkg@ver/node_modules/pkg のような構造を想定
 						const nestedNodeModules = path.join(packagePath, 'node_modules');
 						if (fs.existsSync(nestedNodeModules)) {
-							const nested = findPackageRecursively(nestedNodeModules, targetPackage, depth + 1, maxDepth);
+							const nested = findPackageRecursively(nestedNodeModules, targetPackage, depth + 1, maxDepth, visitedPaths);
 							results.push(...nested);
 						}
 					}
@@ -258,7 +268,7 @@ function findPackageRecursively(nodeModulesPath, targetPackage, depth = 0, maxDe
 				// このパッケージの node_modules も再帰的に検索
 				const nestedNodeModules = path.join(entryPath, 'node_modules');
 				if (fs.existsSync(nestedNodeModules)) {
-					const nested = findPackageRecursively(nestedNodeModules, targetPackage, depth + 1, maxDepth);
+					const nested = findPackageRecursively(nestedNodeModules, targetPackage, depth + 1, maxDepth, visitedPaths);
 					results.push(...nested);
 				}
 			}
@@ -277,20 +287,33 @@ function findPackageRecursively(nodeModulesPath, targetPackage, depth = 0, maxDe
  * @param {Array} compromisedPackages - 侵害パッケージのリスト
  * @param {number} depth - 現在の検索深度
  * @param {number} maxDepth - 最大検索深度
+ * @param {Set} visitedPaths - 循環参照防止用のパスセット
  * @returns {Array} 見つかった依存関係の情報配列
  */
-function scanPackageJsonDependencies(nodeModulesPath, compromisedPackages, depth = 0, maxDepth = 5) {
+function scanPackageJsonDependencies(nodeModulesPath, compromisedPackages, depth = 0, maxDepth = 5, visitedPaths = new Set()) {
 	const results = [];
 
 	if (depth > maxDepth || !fs.existsSync(nodeModulesPath)) {
 		return results;
 	}
 
+	// 循環参照チェック
+	try {
+		const realPath = fs.realpathSync(nodeModulesPath);
+		if (visitedPaths.has(realPath)) {
+			return results;
+		}
+		visitedPaths.add(realPath);
+	} catch (e) {
+		// realpath 取得失敗時は続行
+	}
+
 	try {
 		const entries = fs.readdirSync(nodeModulesPath, { withFileTypes: true });
 
 		for (const entry of entries) {
-			if (!entry.isDirectory()) continue;
+			// ディレクトリまたはシンボリックリンクを対象にする
+			if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
 
 			const entryPath = path.join(nodeModulesPath, entry.name);
 
@@ -302,7 +325,7 @@ function scanPackageJsonDependencies(nodeModulesPath, compromisedPackages, depth
 					});
 
 					for (const scopedEntry of scopedEntries) {
-						if (!scopedEntry.isDirectory()) continue;
+						if (!scopedEntry.isDirectory() && !scopedEntry.isSymbolicLink()) continue;
 
 						const packagePath = path.join(entryPath, scopedEntry.name);
 						const pkgJsonPath = path.join(packagePath, 'package.json');
@@ -341,7 +364,7 @@ function scanPackageJsonDependencies(nodeModulesPath, compromisedPackages, depth
 						// 再帰的に検索
 						const nestedNodeModules = path.join(packagePath, 'node_modules');
 						if (fs.existsSync(nestedNodeModules)) {
-							const nested = scanPackageJsonDependencies(nestedNodeModules, compromisedPackages, depth + 1, maxDepth);
+							const nested = scanPackageJsonDependencies(nestedNodeModules, compromisedPackages, depth + 1, maxDepth, visitedPaths);
 							results.push(...nested);
 						}
 					}
@@ -384,9 +407,9 @@ function scanPackageJsonDependencies(nodeModulesPath, compromisedPackages, depth
 				}
 
 				// 再帰的に検索
-				const nestedNodeModules = path.join(packagePath, 'node_modules');
+				const nestedNodeModules = path.join(entryPath, 'node_modules');
 				if (fs.existsSync(nestedNodeModules)) {
-					const nested = scanPackageJsonDependencies(nestedNodeModules, compromisedPackages, depth + 1, maxDepth);
+					const nested = scanPackageJsonDependencies(nestedNodeModules, compromisedPackages, depth + 1, maxDepth, visitedPaths);
 					results.push(...nested);
 				}
 			}
@@ -403,17 +426,25 @@ if (fs.existsSync(paths.nodeModules)) {
 	let totalFoundCount = 0;
 
 	console.log('');
-	log.info('  🔍 ステップ1: インストール済みパッケージの検査...');
+	log.info('  🔍 インストール済みパッケージの検査...');
 	console.log('');
 
-	// ステップ1: 実際にインストールされているパッケージを検索
-	COMPROMISED_PACKAGES.forEach((pkg) => {
+	// 実際にインストールされているパッケージを検索
+	Array.from(COMPROMISED_PACKAGES_MAP.keys()).forEach((pkg) => {
 		const foundInstances = findPackageRecursively(paths.nodeModules, pkg);
 
 		if (foundInstances.length > 0) {
 			foundInstances.forEach((instance, index) => {
+				// バージョンチェック: 侵害されたバージョンのみを報告
+				if (!isCompromised(pkg, instance.version)) {
+					return; // 安全なバージョンはスキップ
+				}
+
 				const relativePath = path.relative(CONFIG.targetDir, instance.path);
 				const depthInfo = instance.depth > 0 ? ` (深度: ${instance.depth})` : '';
+
+				// 侵害されたバージョンのリストを取得
+				const compromisedVersions = COMPROMISED_PACKAGES_MAP.get(pkg);
 
 				results.foundInNodeModules.push({
 					package: pkg,
@@ -421,14 +452,17 @@ if (fs.existsSync(paths.nodeModules)) {
 					path: instance.path,
 					depth: instance.depth,
 					type: 'installed',
+					compromisedVersions: compromisedVersions, // 侵害されたバージョンリストを追加
 				});
 
 				if (index === 0) {
 					log.error(`  🚨 ${pkg}@${instance.version}${depthInfo}`);
+					log.error(`     侵害バージョン: ${compromisedVersions.join(', ')}`);
 				} else {
 					log.warning(`     ├─ 重複インストール: ${instance.version}${depthInfo}`);
 				}
-				console.log(`     ${c.magenta}Path: ${relativePath}${c.reset}`);
+				// 検出された場所（パス）を明確に表示
+				console.log(`     ${c.magenta}場所: ${relativePath}${c.reset}`);
 
 				totalFoundCount++;
 			});
@@ -440,54 +474,6 @@ if (fs.existsSync(paths.nodeModules)) {
 		log.success('  ✅ インストール済みパッケージに検出なし');
 	} else {
 		log.warning(`  ⚠️  ${totalFoundCount} 個のインスタンスが検出されました`);
-	}
-
-	console.log('');
-	log.info('  🔍 ステップ2: package.json の依存関係を検査...');
-	console.log('');
-
-	// ステップ2: すべての package.json 内の依存関係を検査
-	const dependencyReferences = scanPackageJsonDependencies(paths.nodeModules, COMPROMISED_PACKAGES);
-
-	if (dependencyReferences.length > 0) {
-		// パッケージごとにグループ化
-		const grouped = {};
-		dependencyReferences.forEach((ref) => {
-			if (!grouped[ref.compromisedPackage]) {
-				grouped[ref.compromisedPackage] = [];
-			}
-			grouped[ref.compromisedPackage].push(ref);
-		});
-
-		Object.keys(grouped).forEach((pkg) => {
-			const refs = grouped[pkg];
-			log.warning(`  ⚠️  ${pkg} が ${refs.length} 個の package.json で参照されています`);
-
-			refs.forEach((ref, index) => {
-				const relativePath = path.relative(CONFIG.targetDir, ref.foundIn);
-				const symbol = index === refs.length - 1 ? '└─' : '├─';
-				console.log(`     ${symbol} ${ref.foundInPackageName} (${ref.version})`);
-				console.log(`        ${c.magenta}Path: ${relativePath}${c.reset}`);
-
-				// 結果に追加（重複を避ける）
-				const alreadyAdded = results.foundInNodeModules.find((item) => item.package === pkg && item.path === ref.foundIn);
-
-				if (!alreadyAdded) {
-					results.foundInNodeModules.push({
-						package: pkg,
-						version: ref.version,
-						path: ref.foundIn,
-						depth: ref.depth,
-						type: 'dependency-reference',
-						referencedBy: ref.foundInPackageName,
-					});
-					totalFoundCount++;
-				}
-			});
-			console.log('');
-		});
-	} else {
-		log.success('  ✅ 依存関係の参照に検出なし');
 	}
 
 	console.log('');
@@ -513,13 +499,18 @@ if (fs.existsSync(paths.packageJson)) {
 			if (!deps) return;
 
 			Object.keys(deps).forEach((pkg) => {
-				if (COMPROMISED_PACKAGES.includes(pkg)) {
+				// package.json のバージョンは範囲指定（^1.0.0など）なので、
+				// パッケージ名がブラックリストにあるかだけをチェック
+				if (COMPROMISED_PACKAGES_MAP.has(pkg)) {
+					const compromisedVersions = COMPROMISED_PACKAGES_MAP.get(pkg);
 					results.foundInPackageJson.push({
 						package: pkg,
 						version: deps[pkg],
 						type,
+						compromisedVersions: compromisedVersions,
 					});
 					log.warning(`  ⚠️  ${pkg}@${deps[pkg]} (${type})`);
+					log.warning(`     侵害バージョン: ${compromisedVersions.join(', ')}`);
 				}
 			});
 		};
@@ -546,7 +537,7 @@ log.title('📊 検査結果サマリー');
 console.log('='.repeat(70) + '\n');
 
 // 結果の集計
-results.summary.totalIssues = results.foundInPackageLock.length + results.foundInNodeModules.length + results.foundInPackageJson.length;
+results.summary.totalIssues = results.foundInNodeModules.length + results.foundInPackageJson.length;
 
 results.summary.safe = results.summary.totalIssues === 0;
 
@@ -555,13 +546,11 @@ if (results.foundInNodeModules.length > 0) {
 	results.summary.criticalLevel = 'critical';
 } else if (results.foundInPackageJson.length > 0) {
 	results.summary.criticalLevel = 'high';
-} else if (results.foundInPackageLock.length > 0) {
-	results.summary.criticalLevel = 'medium';
 }
 
 // 検査対象の情報
 console.log(`検査対象: ${c.cyan}${CONFIG.targetDir}${c.reset}`);
-console.log(`検査パッケージ数: ${COMPROMISED_PACKAGES.length}\n`);
+console.log(`検査パッケージ数: ${COMPROMISED_PACKAGES_MAP.size}\n`);
 
 if (results.summary.safe) {
 	log.success('✅ プロジェクトは安全です');
@@ -571,17 +560,54 @@ if (results.summary.safe) {
 	log.error(`   リスクレベル: ${results.summary.criticalLevel.toUpperCase()}\n`);
 
 	console.log('検出箇所:');
-	console.log(`  ${c.yellow}├─${c.reset} package-lock.json: ${results.foundInPackageLock.length} 件`);
 	console.log(`  ${c.yellow}├─${c.reset} node_modules: ${results.foundInNodeModules.length} 件`);
 	console.log(`  ${c.yellow}└─${c.reset} package.json: ${results.foundInPackageJson.length} 件\n`);
 
-	// 検出されたパッケージの一覧
-	const allFound = new Set([...results.foundInPackageLock.map((p) => p.package), ...results.foundInNodeModules.map((p) => p.package), ...results.foundInPackageJson.map((p) => p.package)]);
+	// 検出されたパッケージの一覧と詳細
+	console.log('検出されたパッケージ詳細:');
 
-	console.log('検出されたパッケージ:');
-	Array.from(allFound).forEach((pkg, index) => {
-		const symbol = index === allFound.size - 1 ? '└─' : '├─';
-		console.log(`  ${c.red}${symbol}${c.reset} ${pkg}`);
+	const allFoundPkgs = new Set([...results.foundInNodeModules.map((p) => p.package), ...results.foundInPackageJson.map((p) => p.package)]);
+
+	Array.from(allFoundPkgs).forEach((pkg) => {
+		console.log(`  ${c.red}● ${pkg}${c.reset}`);
+
+		// node_modules での検出（実体）
+		const installed = results.foundInNodeModules.filter((p) => p.package === pkg && p.type === 'installed');
+		installed.forEach((item) => {
+			const relativePath = path.relative(CONFIG.targetDir, item.path);
+			console.log(`    └─ [実体] ${relativePath}`);
+
+			// pnpm のパス構造から親パッケージを推測
+			// 例: node_modules/.pnpm/@stoplight+spectral-rulesets@1.22.0/node_modules/@asyncapi/specs
+			// 親: @stoplight/spectral-rulesets
+			if (relativePath.includes('.pnpm/')) {
+				// @scope+package@version または package@version の形式をマッチ
+				const pnpmMatch = relativePath.match(/\.pnpm\/(@?[^@/]+)@[^/]+\/node_modules\//);
+				if (pnpmMatch) {
+					let parentPkg = pnpmMatch[1];
+					// pnpm はスコープの / を + に置換している
+					parentPkg = parentPkg.replace(/\+/g, '/');
+
+					// 自分自身でなければ表示
+					if (parentPkg !== pkg) {
+						console.log(`       (親パッケージの可能性: ${parentPkg})`);
+					}
+				}
+			}
+		});
+
+		// node_modules での検出（依存関係）
+		const deps = results.foundInNodeModules.filter((p) => p.package === pkg && p.type === 'dependency-reference');
+		deps.forEach((item) => {
+			const relativePath = path.relative(CONFIG.targetDir, item.path);
+			console.log(`    └─ [依存元] ${item.referencedBy} (${relativePath})`);
+		});
+
+		// package.json での検出
+		const inPkgJson = results.foundInPackageJson.filter((p) => p.package === pkg);
+		inPkgJson.forEach((item) => {
+			console.log(`    └─ [定義] package.json > ${item.type}`);
+		});
 	});
 
 	console.log('');
@@ -595,10 +621,9 @@ if (results.summary.safe) {
 	console.log(`   ${c.cyan}cd ${CONFIG.targetDir}${c.reset}`);
 	console.log(`   ${c.cyan}rm -rf node_modules${c.reset}`);
 	console.log(`   ${c.cyan}npm cache clean --force${c.reset}`);
-	console.log(`${c.red}3.${c.reset} package-lock.json から侵害されたパッケージを削除`);
-	console.log(`${c.red}4.${c.reset} package.json から依存関係を削除または更新`);
-	console.log(`${c.red}5.${c.reset} ${c.cyan}npm install${c.reset} で再インストール`);
-	console.log(`${c.red}6.${c.reset} GitHub で 'Sha1-Hulud: The Second Coming' という`);
+	console.log(`${c.red}3.${c.reset} package.json から依存関係を削除または更新`);
+	console.log(`${c.red}4.${c.reset} ${c.cyan}npm install${c.reset} で再インストール`);
+	console.log(`${c.red}5.${c.reset} GitHub で 'Sha1-Hulud: The Second Coming' という`);
 	console.log(`   説明のリポジトリがないか確認\n`);
 }
 
