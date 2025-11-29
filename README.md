@@ -299,3 +299,223 @@ const CONFIG = {
 - 検出されたパッケージは手動で対処する必要があります
 - 定期的に最新の侵害パッケージリストを確認してください
 - preinstall スクリプトで実行される攻撃のため、インストールしただけで感染します
+
+---
+
+# 🛡️ npm-attack-detect-project (English)
+
+A tool to detect compromised packages from the Shai-Hulud supply chain attack
+
+## 📖 Overview
+
+This tool detects npm packages compromised in the Shai-Hulud supply chain attack reported by [Socket.dev](https://socket.dev/blog/shai-hulud-strikes-again-v2) within your projects.
+
+Created by adjusting scripts generated in consultation with [claude.ai chat](https://claude.ai/chat).
+
+### Key Features
+
+- ✅ **Version-Aware Accurate Detection** - Safe versions are not falsely detected
+- ✅ **Multiple Package Manager Support** - npm, pnpm, yarn, Bun
+- ✅ **Fast Scanning** - Completes in ~1 second even for pnpm projects
+- ✅ **Symlink Support** - Correctly handles pnpm structure
+
+### Detection Targets
+
+- `package.json` - Direct dependency definitions
+- `node_modules/` - Actually installed packages (real files and symlinks)
+
+## 🚀 Quick Start
+
+### 1. Setup
+
+```bash
+cd npm-attack-detect-project
+
+# Extract compromised package list
+node extract_packages.cjs
+```
+
+### 2. Scan Your Project
+
+```bash
+# Specify with relative path
+node index.cjs ../my-project
+
+# Specify with absolute path
+node index.cjs /path/to/htdocs/my-project
+
+# Scan current directory
+node index.cjs .
+```
+
+## 📁 File Structure
+
+```
+npm-attack-detect-project/
+├── README.md                          # This file
+├── extract_packages.cjs                # Package list extraction script
+├── index.cjs                           # Scan script (main)
+├── analyze_duplicates.js              # Duplicate analysis script
+├── extract_packages_options.js        # Extraction script with options
+├── npm_black_list.txt                 # Original compromised package list
+├── compromised_packages.csv           # Generated: CSV format list
+└── compromised_packages.json          # Generated: Detailed JSON with versions
+```
+
+## 📊 Understanding Results
+
+### ✅ When Safe
+
+```
+======================================================================
+📊 Scan Results Summary
+======================================================================
+
+Scan target: /path/to/my-project
+Packages checked: 787
+
+✅ Project is safe
+   No compromised packages detected
+```
+
+### 🚨 When Vulnerabilities Detected
+
+```
+======================================================================
+📊 Scan Results Summary
+======================================================================
+
+Scan target: /path/to/my-project
+Packages checked: 787
+
+🚨 2 issues detected
+   Risk level: CRITICAL
+
+Detection locations:
+  ├─ node_modules: 2 instances
+  └─ package.json: 0 instances
+
+Detected package details:
+  ● @asyncapi/specs
+     Compromised versions: 6.8.2, 6.8.3, 6.9.1, 6.10.1
+    └─ [installed v6.8.2] node_modules/.pnpm/@asyncapi+specs@6.8.2/node_modules/@asyncapi/specs
+       (Likely parent package: @stoplight/spectral-rulesets)
+```
+
+## 🆘 Response When Vulnerabilities Detected
+
+### 1. Immediate Actions
+
+```bash
+# Immediately rotate all API keys, tokens, and passwords
+# - GitHub Personal Access Token
+# - AWS Credentials
+# - API Keys
+# - Database Passwords
+# - Other sensitive information
+```
+
+### 2. Project Cleanup
+
+```bash
+# Navigate to affected project
+cd /path/to/affected-project
+
+# Remove node_modules
+rm -rf node_modules
+
+# Clear npm cache
+npm cache clean --force
+```
+
+### 3. Fix Dependencies
+
+#### Option A: Remove Parent Package (Recommended)
+```bash
+# If parent package is unnecessary, remove it
+pnpm remove @stoplight/spectral-rulesets
+# or npm remove @stoplight/spectral-rulesets
+```
+
+#### Option B: Use pnpm.overrides
+```json
+// Add to package.json
+{
+  "pnpm": {
+    "overrides": {
+      "@asyncapi/specs": "6.7.0"  // Specify safe version
+    }
+  }
+}
+```
+
+#### Option C: Update Parent Package
+```bash
+# Newer version may use safe dependencies
+pnpm update @stoplight/spectral-rulesets
+```
+
+### 4. Reinstall
+
+```bash
+# Reinstall from clean state
+npm install
+```
+
+### 5. Check GitHub Repositories
+
+- Check your GitHub account for repositories with description "Sha1-Hulud: The Second Coming"
+- Delete any suspicious repositories immediately
+
+## 🔍 Technical Details
+
+### Scan Logic
+
+1. **node_modules Scan**
+   - Check actually installed packages
+   - Get version information from `package.json`
+   - **Version Check**: Report only compromised versions
+   - **Symlink Support**: Correctly handle pnpm structure
+   - **Optimization**: Direct path search for `.pnpm` directory for speed
+
+2. **package.json Scan**
+   - `dependencies`
+   - `devDependencies`
+   - `peerDependencies`
+   - `optionalDependencies`
+   - Check if package name is in blacklist
+
+### Version-Aware Detection
+
+- **Safe versions not detected**: e.g., `@asyncapi/specs@6.10.0` is safe
+- **Only compromised versions reported**: `6.8.2`, `6.8.3`, `6.9.1`, `6.10.1`, etc.
+- **False positive elimination**: Check both package name and version
+
+### Risk Level Determination
+
+| Level | Condition |
+|-------|-----------|
+| **CRITICAL** | Compromised version actually installed in node_modules |
+| **HIGH** | Compromised package defined in package.json |
+| **NONE** | Not detected |
+
+### Performance
+
+| Package Manager | Execution Time |
+|----------------|----------------|
+| npm | ~1-2 seconds |
+| pnpm | ~1 second |
+| yarn | ~1-2 seconds |
+
+## 📚 References
+
+- [Socket.dev - Shai-Hulud Strikes Again](https://socket.dev/blog/shai-hulud-strikes-again-v2)
+- [GitHub - Shai-Hulud Migration Response](https://github.com/safedep/shai-hulud-migration-response)
+- [npm Security Best Practices](https://docs.npmjs.com/security-best-practices)
+
+## ⚠️ Important Notes
+
+- This tool only detects issues. It does not auto-fix them
+- Detected packages must be handled manually
+- Regularly check for the latest compromised package list
+- The attack executes via preinstall scripts, so infection occurs just by installing
