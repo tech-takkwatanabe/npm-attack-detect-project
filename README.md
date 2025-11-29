@@ -8,11 +8,17 @@ Shai-Hulud サプライチェーン攻撃の侵害パッケージを検出する
 
 [claude.aiチャット](https://claude.ai/chat) に相談して生成されたスクリプトを調整して作成しました。
 
+### 主な機能
+
+- ✅ **バージョンを考慮した正確な検出** - 安全なバージョンは誤検出しない
+- ✅ **複数のパッケージマネージャー対応** - npm, pnpm, yarn, Bun
+- ✅ **高速スキャン** - pnpmプロジェクトでも約1秒で完了
+- ✅ **シンボリックリンク対応** - pnpmの構造を正しく処理
+
 ### 検出対象
 
-- `package.json` - 依存関係の定義
-- `package-lock.json` - インストール済みパッケージの詳細
-- `node_modules/` - 実際にインストールされているパッケージ
+- `package.json` - 直接依存関係の定義
+- `node_modules/` - 実際にインストールされているパッケージ（実体とシンボリックリンク）
 
 ## 🚀 クイックスタート
 
@@ -44,13 +50,12 @@ node index.cjs .
 npm-attack-detect-project/
 ├── README.md                          # このファイル
 ├── extract_packages.cjs                # パッケージリスト抽出スクリプト
-├── index.cjs                           # 検査スクリプト
+├── index.cjs                           # 検査スクリプト（メイン）
 ├── analyze_duplicates.js              # 重複分析スクリプト
 ├── extract_packages_options.js        # オプション付き抽出スクリプト
 ├── npm_black_list.txt                 # 元の侵害パッケージリスト
 ├── compromised_packages.csv           # 生成: CSV形式リスト
-├── compromised_packages.json          # 生成: 詳細JSON
-└── compromised_packages_simple.json   # 生成: シンプルJSON（検査用）
+└── compromised_packages.json          # 生成: バージョン情報付き詳細JSON
 ```
 
 ## 🔧 詳細な使い方
@@ -115,17 +120,18 @@ node index.cjs /var/www/html/production-site
 検査対象: /path/to/my-project
 検査パッケージ数: 573
 
-🚨 3 件の問題が検出されました
+🚨 2 件の問題が検出されました
    リスクレベル: CRITICAL
 
 検出箇所:
-  ├─ package-lock.json: 1 件
   ├─ node_modules: 2 件
-  └─ package.json: 1 件
+  └─ package.json: 0 件
 
-検出されたパッケージ:
-  ├─ posthog-node
-  └─ @asyncapi/cli
+検出されたパッケージ詳細:
+  ● @asyncapi/specs
+     侵害バージョン: 6.8.2, 6.8.3, 6.9.1, 6.10.1
+    └─ [実体 v6.8.2] node_modules/.pnpm/@asyncapi+specs@6.8.2/node_modules/@asyncapi/specs
+       (親パッケージの可能性: @stoplight/spectral-rulesets)
 ```
 
 ## 🆘 脆弱性が検出された場合の対応
@@ -156,12 +162,29 @@ npm cache clean --force
 
 ### 3. 依存関係の修正
 
+#### オプションA: 親パッケージを削除（推奨）
 ```bash
-# package-lock.json から侵害されたパッケージを削除
-# テキストエディタで該当箇所を削除
+# 親パッケージが不要な場合は削除
+pnpm remove @stoplight/spectral-rulesets
+# または npm remove @stoplight/spectral-rulesets
+```
 
-# package.json から依存関係を削除または更新
-# 必要に応じて安全なバージョンに更新
+#### オプションB: pnpm.overrides を使用
+```json
+// package.json に追加
+{
+  "pnpm": {
+    "overrides": {
+      "@asyncapi/specs": "6.7.0"  // 安全なバージョンを指定
+    }
+  }
+}
+```
+
+#### オプションC: 親パッケージを更新
+```bash
+# 新しいバージョンで安全な依存関係を使用している可能性
+pnpm update @stoplight/spectral-rulesets
 ```
 
 ### 4. 再インストール
@@ -218,9 +241,9 @@ node index.cjs ../my-project
 
 ```javascript
 const CONFIG = {
-  packageListFile: path.join(__dirname, 'compromised_packages_simple.json'),
+  packageListFile: path.join(__dirname, 'compromised_packages.json'),
   targetDir: path.resolve(TARGET_DIR),
-  outputFile: null, // レポートの出力先
+  outputFile: null, // レポートの出力先（自動生成）
 };
 ```
 
@@ -228,28 +251,41 @@ const CONFIG = {
 
 ### 検査ロジック
 
-1. **package-lock.json の検査**
-   - `dependencies` セクションをチェック
-   - `packages` セクションをチェック（npm v7+対応）
-
-2. **node_modules の検査**
+1. **node_modules の検査**
    - 実際にインストールされているパッケージを確認
    - `package.json` からバージョン情報を取得
+   - **バージョンチェック**: 侵害されたバージョンのみを報告
+   - **シンボリックリンク対応**: pnpmの構造を正しく処理
+   - **最適化**: `.pnpm`ディレクトリは直接パス検索で高速化
 
-3. **package.json の検査**
+2. **package.json の検査**
    - `dependencies`
    - `devDependencies`
    - `peerDependencies`
    - `optionalDependencies`
+   - パッケージ名がブラックリストにあるかチェック
+
+### バージョンを考慮した検出
+
+- **安全なバージョンは検出しない**: 例えば `@asyncapi/specs@6.10.0` は安全
+- **侵害バージョンのみ報告**: `6.8.2`, `6.8.3`, `6.9.1`, `6.10.1` など
+- **誤検出の排除**: パッケージ名とバージョンの両方をチェック
 
 ### リスクレベルの判定
 
 | レベル | 条件 |
 |--------|------|
-| **CRITICAL** | node_modules に実際にインストールされている |
-| **HIGH** | package.json に定義されている |
-| **MEDIUM** | package-lock.json にのみ存在 |
+| **CRITICAL** | node_modules に侵害バージョンが実際にインストールされている |
+| **HIGH** | package.json に侵害パッケージが定義されている |
 | **NONE** | 検出なし |
+
+### パフォーマンス
+
+| パッケージマネージャー | 実行時間 |
+|---------------------|----------|
+| npm | 約1-2秒 |
+| pnpm | 約1秒 |
+| yarn | 約1-2秒 |
 
 ## 📚 参考リンク
 
