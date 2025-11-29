@@ -111,12 +111,6 @@ const jsonOutput = {
 fs.writeFileSync(OUTPUT_JSON, JSON.stringify(jsonOutput, null, 2), 'utf8');
 console.log(`✅ JSON ファイルを生成しました: ${OUTPUT_JSON}\n`);
 
-// シンプルな配列版JSON（検査スクリプト用）
-const OUTPUT_JSON_SIMPLE = 'compromised_packages_simple.json';
-const simpleJson = packages.map((pkg) => pkg.name);
-fs.writeFileSync(OUTPUT_JSON_SIMPLE, JSON.stringify(simpleJson, null, 2), 'utf8');
-console.log(`✅ シンプル版JSONを生成しました: ${OUTPUT_JSON_SIMPLE}\n`);
-
 // 統計情報
 console.log('='.repeat(60));
 console.log('📊 抽出結果統計');
@@ -152,6 +146,5 @@ topScopes.forEach(([scope, count]) => {
 console.log('\n✅ 完了！');
 console.log('\n生成されたファイル:');
 console.log(`  - ${OUTPUT_CSV} (CSV形式)`);
-console.log(`  - ${OUTPUT_JSON} (詳細JSON)`);
-console.log(`  - ${OUTPUT_JSON_SIMPLE} (シンプルJSON配列)`);
-console.log('\n次のステップ: 検査スクリプトでこれらのファイルを使用できます');
+console.log(`  - ${OUTPUT_JSON} (詳細JSON - バージョン情報付き)`);
+console.log('\n次のステップ: index.cjs でこれらのファイルを使用できます');
