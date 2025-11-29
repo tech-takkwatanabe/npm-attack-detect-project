@@ -148,6 +148,63 @@ console.log('');
 log.title('📂 node_modules を検査中（実体およびシンボリックリンク）...');
 
 /**
+ * .pnpm ディレクトリ内のパッケージを最適化された方法で検索
+ * @param {string} pnpmPath - .pnpm ディレクトリのパス
+ * @param {string} targetPackage - 検索対象のパッケージ名
+ * @param {number} depth - 現在の検索深度
+ * @returns {Array} 見つかったパッケージの情報配列
+ */
+function findInPnpmDirectory(pnpmPath, targetPackage, depth) {
+	const results = [];
+
+	try {
+		// .pnpm ディレクトリ内のエントリを取得
+		const entries = fs.readdirSync(pnpmPath, { withFileTypes: true });
+
+		// パッケージ名のパターンを作成
+		// 例: @scope/package → @scope+package@
+		// 例: package → package@
+		const searchPattern = targetPackage.replace('/', '+') + '@';
+
+		// マッチするディレクトリを探す
+		for (const entry of entries) {
+			if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+
+			// パッケージ名@バージョン の形式にマッチするかチェック
+			if (entry.name.startsWith(searchPattern)) {
+				// .pnpm/package@version/node_modules/package のパスを構築
+				const packageInNodeModules = path.join(pnpmPath, entry.name, 'node_modules', targetPackage);
+
+				if (fs.existsSync(packageInNodeModules)) {
+					const pkgJsonPath = path.join(packageInNodeModules, 'package.json');
+					let version = 'unknown';
+
+					try {
+						if (fs.existsSync(pkgJsonPath)) {
+							const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+							version = pkgJson.version || 'unknown';
+						}
+					} catch (error) {
+						// package.json の読み込みエラーは無視
+					}
+
+					results.push({
+						path: packageInNodeModules,
+						version: version,
+						depth: depth,
+						type: 'installed',
+					});
+				}
+			}
+		}
+	} catch (error) {
+		// エラーは無視
+	}
+
+	return results;
+}
+
+/**
  * node_modules 内を再帰的に検索してパッケージを探す
  * @param {string} nodeModulesPath - 検索する node_modules のパス
  * @param {string} targetPackage - 検索対象のパッケージ名
@@ -184,8 +241,15 @@ function findPackageRecursively(nodeModulesPath, targetPackage, depth = 0, maxDe
 
 			const entryPath = path.join(nodeModulesPath, entry.name);
 
-			// スコープディレクトリ (@scope) または .pnpm の場合
-			if (entry.name.startsWith('@') || entry.name === '.pnpm') {
+			// .pnpm ディレクトリの場合は最適化された検索を使用
+			if (entry.name === '.pnpm') {
+				const pnpmResults = findInPnpmDirectory(entryPath, targetPackage, depth + 1);
+				results.push(...pnpmResults);
+				continue; // .pnpm の中は再帰しない（最適化済み）
+			}
+
+			// スコープディレクトリ (@scope) の場合
+			if (entry.name.startsWith('@')) {
 				try {
 					const scopedEntries = fs.readdirSync(entryPath, {
 						withFileTypes: true,
@@ -194,44 +258,32 @@ function findPackageRecursively(nodeModulesPath, targetPackage, depth = 0, maxDe
 					for (const scopedEntry of scopedEntries) {
 						if (!scopedEntry.isDirectory() && !scopedEntry.isSymbolicLink()) continue;
 
-						// .pnpm の直下は package@version 形式のディレクトリだが、
-						// スコープと同じように再帰探索の起点として扱う
+						const fullPackageName = `${entry.name}/${scopedEntry.name}`;
 						const packagePath = path.join(entryPath, scopedEntry.name);
 
-						// .pnpm 内のパッケージの場合、さらにその中の node_modules を探す必要がある
-						// 通常のスコープ (@scope/pkg) とは構造が少し異なるが、
-						// 以下のロジックで汎用的に処理できるか確認
+						// ターゲットパッケージと一致するか確認
+						if (fullPackageName === targetPackage) {
+							const pkgJsonPath = path.join(packagePath, 'package.json');
+							let version = 'unknown';
 
-						// 1. そのディレクトリ自体がパッケージかチェック (package.jsonがあるか)
-						if (entry.name !== '.pnpm') {
-							// @scope/pkg の場合
-							const fullPackageName = `${entry.name}/${scopedEntry.name}`;
-
-							// ターゲットパッケージと一致するか確認
-							if (fullPackageName === targetPackage) {
-								const pkgJsonPath = path.join(packagePath, 'package.json');
-								let version = 'unknown';
-
-								try {
-									if (fs.existsSync(pkgJsonPath)) {
-										const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
-										version = pkgJson.version || 'unknown';
-									}
-								} catch (error) {
-									// package.json の読み込みエラーは無視
+							try {
+								if (fs.existsSync(pkgJsonPath)) {
+									const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+									version = pkgJson.version || 'unknown';
 								}
-
-								results.push({
-									path: packagePath,
-									version: version,
-									depth: depth,
-									type: 'installed',
-								});
+							} catch (error) {
+								// package.json の読み込みエラーは無視
 							}
+
+							results.push({
+								path: packagePath,
+								version: version,
+								depth: depth,
+								type: 'installed',
+							});
 						}
 
-						// 2. そのディレクトリの中に node_modules があるかチェック (再帰)
-						// .pnpm/pkg@ver/node_modules/pkg のような構造を想定
+						// このパッケージの node_modules も再帰的に検索
 						const nestedNodeModules = path.join(packagePath, 'node_modules');
 						if (fs.existsSync(nestedNodeModules)) {
 							const nested = findPackageRecursively(nestedNodeModules, targetPackage, depth + 1, maxDepth, visitedPaths);
