@@ -6,7 +6,7 @@ Shai-Hulud サプライチェーン攻撃の侵害パッケージを検出する
 
 このツールは、[Socket.dev](https://socket.dev/blog/shai-hulud-strikes-again-v2) が報告した Shai-Hulud サプライチェーン攻撃で侵害されたnpmパッケージを、プロジェクト内から検出します。
 
-[claude.aiチャット](https://claude.ai/chat) に相談して生成されたスクリプトを調整して作成しました。
+[claude.aiチャット](https://claude.ai/chat) に相談して生成されたスクリプトを基本に、独自で作成しました。調整には[Gooogle Antigravity](https://antigravity.google/)を活用しました。
 
 ### 主な機能
 
@@ -299,7 +299,7 @@ A tool to detect compromised packages from the Shai-Hulud supply chain attack
 
 This tool detects npm packages compromised in the Shai-Hulud supply chain attack reported by [Socket.dev](https://socket.dev/blog/shai-hulud-strikes-again-v2) within your projects.
 
-Created by adjusting scripts generated in consultation with [claude.ai chat](https://claude.ai/chat).
+Created based on scripts generated in consultation with [claude.ai chat](https://claude.ai/chat). Adjustments were made using [Google Antigravity](https://antigravity.google/).
 
 ### Key Features
 
