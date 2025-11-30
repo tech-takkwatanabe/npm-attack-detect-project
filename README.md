@@ -12,7 +12,7 @@ Shai-Hulud サプライチェーン攻撃の侵害パッケージを検出する
 
 - ✅ **バージョンを考慮した正確な検出** - 安全なバージョンは誤検出しない
 - ✅ **複数のパッケージマネージャー対応** - npm, pnpm, yarn, Bun
-- ✅ **高速スキャン** - pnpmプロジェクトでも約1秒で完了
+- ✅ **高速スキャン** - 約1〜2秒で完了
 - ✅ **シンボリックリンク対応** - pnpmの構造を正しく処理
 
 ### 検出対象
@@ -39,9 +39,6 @@ node index.cjs ../my-project
 
 # 絶対パスで指定
 node index.cjs /path/to/htdocs/my-project
-
-# カレントディレクトリを検査
-node index.cjs .
 ```
 
 ## 📁 ファイル構成
@@ -279,14 +276,6 @@ const CONFIG = {
 | **HIGH** | package.json に侵害パッケージが定義されている |
 | **NONE** | 検出なし |
 
-### パフォーマンス
-
-| パッケージマネージャー | 実行時間 |
-|---------------------|----------|
-| npm | 約1-2秒 |
-| pnpm | 約1秒 |
-| yarn | 約1-2秒 |
-
 ## 📚 参考リンク
 
 - [Socket.dev - Shai-Hulud Strikes Again](https://socket.dev/blog/shai-hulud-strikes-again-v2)
@@ -316,7 +305,7 @@ Created by adjusting scripts generated in consultation with [claude.ai chat](htt
 
 - ✅ **Version-Aware Accurate Detection** - Safe versions are not falsely detected
 - ✅ **Multiple Package Manager Support** - npm, pnpm, yarn, Bun
-- ✅ **Fast Scanning** - Completes in ~1 second even for pnpm projects
+- ✅ **Fast Scanning** - Completes in ~1-2 seconds
 - ✅ **Symlink Support** - Correctly handles pnpm structure
 
 ### Detection Targets
@@ -343,9 +332,6 @@ node index.cjs ../my-project
 
 # Specify with absolute path
 node index.cjs /path/to/htdocs/my-project
-
-# Scan current directory
-node index.cjs .
 ```
 
 ## 📁 File Structure
@@ -498,14 +484,6 @@ npm install
 | **CRITICAL** | Compromised version actually installed in node_modules |
 | **HIGH** | Compromised package defined in package.json |
 | **NONE** | Not detected |
-
-### Performance
-
-| Package Manager | Execution Time |
-|----------------|----------------|
-| npm | ~1-2 seconds |
-| pnpm | ~1 second |
-| yarn | ~1-2 seconds |
 
 ## 📚 References
 
