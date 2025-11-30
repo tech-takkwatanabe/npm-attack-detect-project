@@ -533,6 +533,42 @@ if (fs.existsSync(paths.nodeModules)) {
 	if (totalFoundCount > 0) {
 		log.warning(`  📊 合計 ${totalFoundCount} 件の問題を検出`);
 	}
+
+	// node_modules 内のパッケージの依存関係もチェック
+	console.log('');
+	log.info('  🔍 インストール済みパッケージの依存関係を検査...');
+	console.log('');
+
+	const depResults = scanPackageJsonDependencies(paths.nodeModules, Array.from(COMPROMISED_PACKAGES_MAP.keys()));
+
+	if (depResults.length > 0) {
+		depResults.forEach((dep) => {
+			// バージョンチェック: 侵害されたバージョンのみを報告
+			// 依存関係のバージョンは範囲指定の可能性があるため、パッケージ名のみでチェック
+			const compromisedVersions = COMPROMISED_PACKAGES_MAP.get(dep.compromisedPackage);
+			const relativePath = path.relative(CONFIG.targetDir, dep.foundIn);
+
+			results.foundInNodeModules.push({
+				package: dep.compromisedPackage,
+				version: dep.version,
+				path: dep.foundIn,
+				depth: dep.depth,
+				type: 'dependency-reference',
+				referencedBy: dep.foundInPackageName,
+				compromisedVersions: compromisedVersions,
+			});
+
+			log.warning(`  ⚠️  ${dep.compromisedPackage}@${dep.version}`);
+			log.warning(`     依存元: ${dep.foundInPackageName}`);
+			log.warning(`     場所: ${relativePath}`);
+			log.warning(`     侵害バージョン: ${compromisedVersions.join(', ')}`);
+			totalFoundCount++;
+		});
+
+		log.warning(`  ⚠️  ${depResults.length} 個の依存関係参照が検出されました`);
+	} else {
+		log.success('  ✅ パッケージの依存関係に検出なし');
+	}
 } else {
 	log.warning('  ⚠️  node_modules が見つかりません');
 	log.info(`     期待パス: ${paths.nodeModules}`);
