@@ -542,30 +542,97 @@ if (fs.existsSync(paths.nodeModules)) {
 	const depResults = scanPackageJsonDependencies(paths.nodeModules, Array.from(COMPROMISED_PACKAGES_MAP.keys()));
 
 	if (depResults.length > 0) {
-		depResults.forEach((dep) => {
-			// バージョンチェック: 侵害されたバージョンのみを報告
-			// 依存関係のバージョンは範囲指定の可能性があるため、パッケージ名のみでチェック
-			const compromisedVersions = COMPROMISED_PACKAGES_MAP.get(dep.compromisedPackage);
-			const relativePath = path.relative(CONFIG.targetDir, dep.foundIn);
+		let validDepCount = 0;
 
-			results.foundInNodeModules.push({
-				package: dep.compromisedPackage,
-				version: dep.version,
-				path: dep.foundIn,
-				depth: dep.depth,
-				type: 'dependency-reference',
-				referencedBy: dep.foundInPackageName,
-				compromisedVersions: compromisedVersions,
+		depResults.forEach((dep) => {
+			const compromisedVersions = COMPROMISED_PACKAGES_MAP.get(dep.compromisedPackage);
+
+			// 実際にそのパッケージがインストールされているか確認
+			const installedInstances = findPackageRecursively(paths.nodeModules, dep.compromisedPackage);
+
+			// インストールされている場合、そのバージョンが侵害されているかチェック
+			let hasCompromisedVersion = false;
+			const installedCompromisedVersions = [];
+
+			installedInstances.forEach((instance) => {
+				if (isCompromised(dep.compromisedPackage, instance.version)) {
+					hasCompromisedVersion = true;
+					installedCompromisedVersions.push(instance.version);
+				}
 			});
 
-			log.warning(`  ⚠️  ${dep.compromisedPackage}@${dep.version}`);
-			log.warning(`     依存元: ${dep.foundInPackageName}`);
-			log.warning(`     場所: ${relativePath}`);
-			log.warning(`     侵害バージョン: ${compromisedVersions.join(', ')}`);
-			totalFoundCount++;
+			// 侵害されたバージョンが実際にインストールされている場合のみ報告
+			if (hasCompromisedVersion) {
+				const relativePath = path.relative(CONFIG.targetDir, dep.foundIn);
+
+				results.foundInNodeModules.push({
+					package: dep.compromisedPackage,
+					version: installedCompromisedVersions.join(', '),
+					path: dep.foundIn,
+					depth: dep.depth,
+					type: 'dependency-reference',
+					referencedBy: dep.foundInPackageName,
+					compromisedVersions: compromisedVersions,
+				});
+
+				log.warning(`  ⚠️  ${dep.compromisedPackage}@${installedCompromisedVersions.join(', ')}`);
+				log.warning(`     依存元: ${dep.foundInPackageName} (要求: ${dep.version})`);
+				log.warning(`     場所: ${relativePath}`);
+				log.warning(`     侵害バージョン: ${compromisedVersions.join(', ')}`);
+				totalFoundCount++;
+				validDepCount++;
+			} else if (installedInstances.length === 0) {
+				// インストールされていない場合、バージョン範囲が侵害バージョンを含む可能性をチェック
+				// 簡易チェック: ^, ~, >=, > などの範囲指定の場合、警告を出す
+				const versionRange = dep.version;
+				let couldBeCompromised = false;
+
+				// 範囲指定記号を除去して基準バージョンを取得
+				const baseVersion = versionRange.replace(/^[\^~>=<]+/, '').trim();
+
+				// 侵害バージョンと比較
+				compromisedVersions.forEach((compromisedVer) => {
+					// ^3.24.1 の場合、3.24.1 を含む可能性がある
+					if (versionRange.startsWith('^') || versionRange.startsWith('~') || versionRange.includes('>=') || versionRange.includes('>')) {
+						// 基準バージョンが侵害バージョンと一致、または侵害バージョンが範囲に含まれる可能性
+						if (baseVersion === compromisedVer || versionRange.includes(compromisedVer)) {
+							couldBeCompromised = true;
+						}
+					} else if (baseVersion === compromisedVer) {
+						// 完全一致
+						couldBeCompromised = true;
+					}
+				});
+
+				if (couldBeCompromised) {
+					const relativePath = path.relative(CONFIG.targetDir, dep.foundIn);
+
+					results.foundInNodeModules.push({
+						package: dep.compromisedPackage,
+						version: dep.version,
+						path: dep.foundIn,
+						depth: dep.depth,
+						type: 'dependency-reference',
+						referencedBy: dep.foundInPackageName,
+						compromisedVersions: compromisedVersions,
+					});
+
+					log.warning(`  ⚠️  ${dep.compromisedPackage}@${dep.version} (未インストール)`);
+					log.warning(`     依存元: ${dep.foundInPackageName}`);
+					log.warning(`     場所: ${relativePath}`);
+					log.warning(`     侵害バージョン: ${compromisedVersions.join(', ')}`);
+					log.warning(`     注意: バージョン範囲が侵害バージョンを含む可能性があります`);
+					totalFoundCount++;
+					validDepCount++;
+				}
+			}
 		});
 
-		log.warning(`  ⚠️  ${depResults.length} 個の依存関係参照が検出されました`);
+		if (validDepCount > 0) {
+			log.warning(`  ⚠️  ${validDepCount} 個の侵害された依存関係参照が検出されました`);
+		} else {
+			log.success('  ✅ パッケージの依存関係に侵害されたバージョンは検出なし');
+		}
 	} else {
 		log.success('  ✅ パッケージの依存関係に検出なし');
 	}
