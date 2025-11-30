@@ -369,8 +369,31 @@ function scanPackageJsonDependencies(nodeModulesPath, compromisedPackages, depth
 
 			const entryPath = path.join(nodeModulesPath, entry.name);
 
+			// .pnpm ディレクトリの場合
+			if (entry.name === '.pnpm') {
+				try {
+					const pnpmEntries = fs.readdirSync(entryPath, {
+						withFileTypes: true,
+					});
+
+					for (const pnpmEntry of pnpmEntries) {
+						if (!pnpmEntry.isDirectory() && !pnpmEntry.isSymbolicLink()) continue;
+
+						// .pnpm/package@version/node_modules の構造
+						const packageVersionPath = path.join(entryPath, pnpmEntry.name);
+						const pnpmNodeModules = path.join(packageVersionPath, 'node_modules');
+
+						if (fs.existsSync(pnpmNodeModules)) {
+							const nested = scanPackageJsonDependencies(pnpmNodeModules, compromisedPackages, depth + 1, maxDepth, visitedPaths);
+							results.push(...nested);
+						}
+					}
+				} catch (error) {
+					// エラーは無視
+				}
+			}
 			// スコープディレクトリの場合
-			if (entry.name.startsWith('@')) {
+			else if (entry.name.startsWith('@')) {
 				try {
 					const scopedEntries = fs.readdirSync(entryPath, {
 						withFileTypes: true,
