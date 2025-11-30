@@ -606,12 +606,12 @@ if (fs.existsSync(paths.nodeModules)) {
 				validDepCount++;
 			} else if (installedInstances.length === 0) {
 				// インストールされていない場合、バージョン範囲が侵害バージョンを含む可能性をチェック
-				// 簡易チェック: ^, ~, >=, > などの範囲指定の場合、警告を出す
+				// 簡易チェック: ^, ~, >=, >, v などの範囲指定の場合、警告を出す
 				const versionRange = dep.version;
 				let couldBeCompromised = false;
 
-				// 範囲指定記号を除去して基準バージョンを取得
-				const baseVersion = versionRange.replace(/^[\^~>=<]+/, '').trim();
+				// 範囲指定記号とvプレフィックスを除去して基準バージョンを取得
+				const baseVersion = versionRange.replace(/^[v\^~>=<]+/, '').trim();
 
 				// 侵害バージョンと比較
 				compromisedVersions.forEach((compromisedVer) => {
@@ -622,7 +622,7 @@ if (fs.existsSync(paths.nodeModules)) {
 							couldBeCompromised = true;
 						}
 					} else if (baseVersion === compromisedVer) {
-						// 完全一致
+						// 完全一致 (v3.24.1 や 3.24.1 など)
 						couldBeCompromised = true;
 					}
 				});
