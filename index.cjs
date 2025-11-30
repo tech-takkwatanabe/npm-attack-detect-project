@@ -657,7 +657,30 @@ if (results.summary.safe) {
 	const allFoundPkgs = new Set([...results.foundInNodeModules.map((p) => p.package), ...results.foundInPackageJson.map((p) => p.package)]);
 
 	Array.from(allFoundPkgs).forEach((pkg) => {
-		console.log(`  ${c.red}● ${pkg}${c.reset}`);
+		// このパッケージで検出されたすべてのバージョンを収集
+		const allVersions = new Set();
+
+		// node_modules から検出されたバージョン
+		results.foundInNodeModules
+			.filter((p) => p.package === pkg)
+			.forEach((item) => {
+				if (item.version && item.version !== 'unknown') {
+					allVersions.add(item.version);
+				}
+			});
+
+		// package.json から検出されたバージョン（範囲指定の可能性あり）
+		results.foundInPackageJson
+			.filter((p) => p.package === pkg)
+			.forEach((item) => {
+				if (item.version) {
+					allVersions.add(item.version);
+				}
+			});
+
+		// バージョン情報を表示
+		const versionStr = allVersions.size > 0 ? `(${Array.from(allVersions).join(', ')})` : '';
+		console.log(`  ${c.red}● ${pkg}${versionStr}${c.reset}`);
 
 		// node_modules での検出（実体）
 		const installed = results.foundInNodeModules.filter((p) => p.package === pkg && p.type === 'installed');
