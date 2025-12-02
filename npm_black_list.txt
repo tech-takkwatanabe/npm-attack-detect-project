@@ -1,6 +1,5 @@
 --- source : https://socket.dev/blog/shai-hulud-strikes-again-v2#Indicators-of-Compromise ---
 
----
 @accordproject/concerto-analysis (v3.24.1)
 @accordproject/concerto-linter (v3.24.1)
 @accordproject/concerto-linter-default-ruleset (v3.24.1)
