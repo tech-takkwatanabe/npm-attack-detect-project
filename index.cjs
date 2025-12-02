@@ -81,25 +81,41 @@ let COMPROMISED_PACKAGES_DATA = null;
 let COMPROMISED_PACKAGES_MAP = new Map(); // パッケージ名 -> バージョンリストのマップ
 
 try {
-	if (fs.existsSync(CONFIG.packageListFile)) {
-		log.info(`📂 パッケージリストを読み込み中: ${path.basename(CONFIG.packageListFile)}`);
-		const data = fs.readFileSync(CONFIG.packageListFile, 'utf8');
-		COMPROMISED_PACKAGES_DATA = JSON.parse(data);
+	if (!fs.existsSync(CONFIG.packageListFile)) {
+		// compromised_packages.json が存在しない場合、自動的に生成
+		log.warning(`📦 ${path.basename(CONFIG.packageListFile)} が見つかりません`);
+		log.info(`📝 パッケージリストを自動生成します...\n`);
 
-		// パッケージ名とバージョンのマップを作成
-		COMPROMISED_PACKAGES_DATA.packages.forEach((pkg) => {
-			// バージョンから 'v' プレフィックスを削除して正規化
-			const normalizedVersions = pkg.versions.map((v) => v.replace(/^v/, ''));
-			COMPROMISED_PACKAGES_MAP.set(pkg.name, normalizedVersions);
-		});
-
-		log.success(`✅ ${COMPROMISED_PACKAGES_MAP.size} 個のパッケージ（バージョン情報付き）を読み込みました\n`);
-	} else {
-		log.error(`❌ エラー: ${CONFIG.packageListFile} が見つかりません`);
-		log.warning(`\n最初に extract_packages.cjs を実行してください:`);
-		console.log(`   node extract_packages.cjs\n`);
-		process.exit(1);
+		const { execSync } = require('child_process');
+		try {
+			execSync('node extract_packages.cjs', {
+				stdio: 'inherit',
+				cwd: __dirname,
+			});
+			console.log('');
+			log.success(`✅ パッケージリストの生成が完了しました\n`);
+		} catch (extractError) {
+			log.error(`❌ パッケージリストの生成に失敗しました`);
+			log.error(`   エラー: ${extractError.message}`);
+			log.warning(`\n手動で実行してください:`);
+			console.log(`   node extract_packages.cjs\n`);
+			process.exit(1);
+		}
 	}
+
+	// パッケージリストを読み込み
+	log.info(`📂 パッケージリストを読み込み中: ${path.basename(CONFIG.packageListFile)}`);
+	const data = fs.readFileSync(CONFIG.packageListFile, 'utf8');
+	COMPROMISED_PACKAGES_DATA = JSON.parse(data);
+
+	// パッケージ名とバージョンのマップを作成
+	COMPROMISED_PACKAGES_DATA.packages.forEach((pkg) => {
+		// バージョンから 'v' プレフィックスを削除して正規化
+		const normalizedVersions = pkg.versions.map((v) => v.replace(/^v/, ''));
+		COMPROMISED_PACKAGES_MAP.set(pkg.name, normalizedVersions);
+	});
+
+	log.success(`✅ ${COMPROMISED_PACKAGES_MAP.size} 個のパッケージ（バージョン情報付き）を読み込みました\n`);
 } catch (error) {
 	log.error(`❌ パッケージリストの読み込みに失敗: ${error.message}`);
 	process.exit(1);
