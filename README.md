@@ -27,10 +27,8 @@ Shai-Hulud サプライチェーン攻撃の侵害パッケージを検出する
 ### 1. セットアップ
 
 ```bash
+git clone https://github.com/tech-takkwatanabe/npm-attack-detect-project.git
 cd npm-attack-detect-project
-
-# 依存関係のインストール
-npm install
 ```
 
 ### 2. プロジェクトの検査
@@ -324,10 +322,8 @@ Created based on scripts generated in consultation with [claude.ai chat](https:/
 ### 1. Setup
 
 ```bash
+git clone https://github.com/tech-takkwatanabe/npm-attack-detect-project.git
 cd npm-attack-detect-project
-
-# Install dependencies
-npm install
 ```
 
 ### 2. Scan Your Project
