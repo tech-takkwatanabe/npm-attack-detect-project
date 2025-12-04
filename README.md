@@ -148,7 +148,33 @@ node index.cjs /var/www/html/production-site
 # - その他の機密情報
 ```
 
-### 2. プロジェクトのクリーンアップ
+### 2. ローカル環境の確認
+
+攻撃によって作成された可能性のあるファイルを確認します：
+
+```bash
+# プロジェクトディレクトリで以下のファイルを検索
+find . -name "setup_bun.js" -o -name "bun_environment.js" -o -name "cloud.json" -o -name "environment.json" -o -name "actionsSecrets.json"
+```
+
+**確認すべきファイル：**
+
+| ファイル名 | 説明 |
+|-----------|------|
+| `setup_bun.js` | ドロッパー（マルウェア配布スクリプト） |
+| `bun_environment.js` | メインペイロード（10MB以上の難読化ファイル） |
+| `cloud.json` | AWS/GCP/Azure認証情報が窃取された可能性 |
+| `environment.json` | 環境変数が窃取された可能性 |
+| `actionsSecrets.json` | GitHub Actions シークレットが窃取された可能性 |
+
+**これらのファイルが見つかった場合：**
+1. **即座に削除**してください
+2. 対応する認証情報を**すべてローテーション**してください
+3. システムの完全なセキュリティ監査を実施してください
+
+参考: [Zenn - Shai-Hulud攻撃の詳細](https://zenn.dev/hand_dot/articles/04542a91bc432e)
+
+### 3. プロジェクトのクリーンアップ
 
 ```bash
 # プロジェクトディレクトリに移動
@@ -161,7 +187,7 @@ rm -rf node_modules
 npm cache clean --force
 ```
 
-### 3. 依存関係の修正
+### 4. 依存関係の修正
 
 #### オプションA: 親パッケージを削除（推奨）
 ```bash
@@ -188,14 +214,14 @@ pnpm remove @stoplight/spectral-rulesets
 pnpm update @stoplight/spectral-rulesets
 ```
 
-### 4. 再インストール
+### 5. 再インストール
 
 ```bash
 # クリーンな状態から再インストール
 npm install
 ```
 
-### 5. GitHub リポジトリの確認
+### 6. GitHub リポジトリの確認
 
 - GitHubアカウントで "Sha1-Hulud: The Second Coming" という説明のリポジトリがないか確認
 - 不審なリポジトリがあれば即座に削除
@@ -411,7 +437,33 @@ Detected package details:
 # - Other sensitive information
 ```
 
-### 2. Project Cleanup
+### 2. Check Local Environment
+
+Check for files that may have been created by the attack:
+
+```bash
+# Search for the following files in your project directory
+find . -name "setup_bun.js" -o -name "bun_environment.js" -o -name "cloud.json" -o -name "environment.json" -o -name "actionsSecrets.json"
+```
+
+**Files to check:**
+
+| Filename | Description |
+|----------|-------------|
+| `setup_bun.js` | Dropper (malware distribution script) |
+| `bun_environment.js` | Main payload (obfuscated file over 10MB) |
+| `cloud.json` | AWS/GCP/Azure credentials may have been stolen |
+| `environment.json` | Environment variables may have been stolen |
+| `actionsSecrets.json` | GitHub Actions secrets may have been stolen |
+
+**If these files are found:**
+1. **Delete immediately**
+2. **Rotate all** corresponding credentials
+3. Conduct a complete security audit of your system
+
+Reference: [Zenn - Shai-Hulud Attack Details](https://zenn.dev/hand_dot/articles/04542a91bc432e)
+
+### 3. Project Cleanup
 
 ```bash
 # Navigate to affected project
@@ -424,7 +476,7 @@ rm -rf node_modules
 npm cache clean --force
 ```
 
-### 3. Fix Dependencies
+### 4. Fix Dependencies
 
 #### Option A: Remove Parent Package (Recommended)
 ```bash
@@ -451,14 +503,14 @@ pnpm remove @stoplight/spectral-rulesets
 pnpm update @stoplight/spectral-rulesets
 ```
 
-### 4. Reinstall
+### 5. Reinstall
 
 ```bash
 # Reinstall from clean state
 npm install
 ```
 
-### 5. Check GitHub Repositories
+### 6. Check GitHub Repositories
 
 - Check your GitHub account for repositories with description "Sha1-Hulud: The Second Coming"
 - Delete any suspicious repositories immediately
