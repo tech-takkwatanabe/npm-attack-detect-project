@@ -4,7 +4,8 @@ Shai-Hulud サプライチェーン攻撃の侵害パッケージを検出する
 
 ## 📖 概要
 
-このツールは、[Socket.dev](https://socket.dev/blog/shai-hulud-strikes-again-v2) が報告した Shai-Hulud サプライチェーン攻撃で侵害されたnpmパッケージを、プロジェクト内から検出します。
+このツールは、Shai-Hulud サプライチェーン攻撃などで侵害されたnpmパッケージを、プロジェクト内から検出します。
+[Socket.dev](https://socket.dev/blog/shai-hulud-strikes-again-v2) などのセキュリティレポートに基づいたブラックリストを使用して検査を行います。
 
 **⚠️ 重要: このツールは、プロジェクトに「すでにインストールされているパッケージ」が安全かどうかを検証するためのものです。**
 
@@ -50,7 +51,14 @@ npm-attack-detect-project/
 ├── index.cjs                           # 検査スクリプト（メイン）
 ├── analyze_duplicates.js              # 重複分析スクリプト
 ├── extract_packages_options.js        # オプション付き抽出スクリプト
-├── npm_black_list.txt                 # 元の侵害パッケージリスト
+npm-attack-detect-project/
+├── README.md                          # このファイル
+├── extract_packages.cjs                # パッケージリスト抽出スクリプト
+├── index.cjs                           # 検査スクリプト（メイン）
+├── analyze_duplicates.js              # 重複分析スクリプト
+├── extract_packages_options.js        # オプション付き抽出スクリプト
+├── blacklists/                        # 侵害パッケージリスト置き場
+│   └── npm_black_list.txt             # 元の侵害パッケージリスト
 ├── compromised_packages.csv           # 生成: CSV形式リスト
 └── compromised_packages.json          # 生成: バージョン情報付き詳細JSON
 ```
@@ -59,7 +67,8 @@ npm-attack-detect-project/
 
 ### パッケージリストの抽出
 
-- `npm_black_list.txt`からパッケージ名を抽出します。
+- `blacklists` ディレクトリ内のすべての `.txt` ファイルからパッケージ名を抽出します。
+- 新しいリストを追加したい場合は、このディレクトリに `.txt` ファイルを置いてください。
 - `index.cjs` を実行した際に、リストファイル（`compromised_packages.json`）が存在しない場合は**自動的に実行されます**。
 - リストを手動で更新したい場合のみ、以下のコマンドを実行してください。
 
@@ -214,9 +223,14 @@ security_check_report_2025-11-28.json
 
 ### 1. 新しいリストを取得
 
+セキュリティベンダーのブログやレポートから、侵害されたパッケージのリストを入手します。
+
+- 例: [Socket.dev Blog](https://socket.dev/blog)
+- 例: [Sonatype Blog](https://www.sonatype.com/blog)
+
 ```bash
-# Socket.dev から最新のリストを取得
-# npm_black_list.txt を更新
+# 新しいリストを blacklists ディレクトリに追加
+# 例: blacklists/new_list.txt
 ```
 
 ### 2. 再抽出
@@ -299,7 +313,8 @@ A tool to detect compromised packages from the Shai-Hulud supply chain attack
 
 ## 📖 Overview
 
-This tool detects npm packages compromised in the Shai-Hulud supply chain attack reported by [Socket.dev](https://socket.dev/blog/shai-hulud-strikes-again-v2) within your projects.
+This tool detects npm packages compromised in supply chain attacks (like Shai-Hulud) within your projects.
+It uses blacklists based on security reports from sources like [Socket.dev](https://socket.dev/blog/shai-hulud-strikes-again-v2).
 
 **⚠️ IMPORTANT: This tool is designed to verify whether packages "already installed" in your project are safe.**
 
@@ -344,8 +359,14 @@ npm-attack-detect-project/
 ├── extract_packages.cjs                # Package list extraction script
 ├── index.cjs                           # Scan script (main)
 ├── analyze_duplicates.js              # Duplicate analysis script
+npm-attack-detect-project/
+├── README.md                          # This file
+├── extract_packages.cjs                # Package list extraction script
+├── index.cjs                           # Scan script (main)
+├── analyze_duplicates.js              # Duplicate analysis script
 ├── extract_packages_options.js        # Extraction script with options
-├── npm_black_list.txt                 # Original compromised package list
+├── blacklists/                        # Directory for blacklist files
+│   └── npm_black_list.txt             # Original compromised package list
 ├── compromised_packages.csv           # Generated: CSV format list
 └── compromised_packages.json          # Generated: Detailed JSON with versions
 ```
