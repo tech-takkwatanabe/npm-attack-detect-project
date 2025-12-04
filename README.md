@@ -49,16 +49,9 @@ npm-attack-detect-project/
 ├── README.md                          # このファイル
 ├── extract_packages.cjs                # パッケージリスト抽出スクリプト
 ├── index.cjs                           # 検査スクリプト（メイン）
-├── analyze_duplicates.js              # 重複分析スクリプト
-├── extract_packages_options.js        # オプション付き抽出スクリプト
-npm-attack-detect-project/
-├── README.md                          # このファイル
-├── extract_packages.cjs                # パッケージリスト抽出スクリプト
-├── index.cjs                           # 検査スクリプト（メイン）
-├── analyze_duplicates.js              # 重複分析スクリプト
-├── extract_packages_options.js        # オプション付き抽出スクリプト
 ├── blacklists/                        # 侵害パッケージリスト置き場
-│   └── npm_black_list.txt             # 元の侵害パッケージリスト
+│   ├── npm_black_list_20251128.txt    # 侵害パッケージリスト (2025/11/28)
+│   └── npm_black_list_20250919.txt    # 侵害パッケージリスト (2025/09/19)
 ├── compromised_packages.csv           # 生成: CSV形式リスト
 └── compromised_packages.json          # 生成: バージョン情報付き詳細JSON
 ```
@@ -358,15 +351,9 @@ npm-attack-detect-project/
 ├── README.md                          # This file
 ├── extract_packages.cjs                # Package list extraction script
 ├── index.cjs                           # Scan script (main)
-├── analyze_duplicates.js              # Duplicate analysis script
-npm-attack-detect-project/
-├── README.md                          # This file
-├── extract_packages.cjs                # Package list extraction script
-├── index.cjs                           # Scan script (main)
-├── analyze_duplicates.js              # Duplicate analysis script
-├── extract_packages_options.js        # Extraction script with options
 ├── blacklists/                        # Directory for blacklist files
-│   └── npm_black_list.txt             # Original compromised package list
+│   ├── npm_black_list_20251128.txt    # Compromised package list (2025/11/28)
+│   └── npm_black_list_20250919.txt    # Compromised package list (2025/09/19)
 ├── compromised_packages.csv           # Generated: CSV format list
 └── compromised_packages.json          # Generated: Detailed JSON with versions
 ```
