@@ -161,7 +161,6 @@ const results = {
 console.log('');
 
 // node_modules の検査
-log.title('📂 node_modules を検査中（実体およびシンボリックリンク）...');
 
 /**
  * .pnpm ディレクトリ内のパッケージを最適化された方法で検索
@@ -511,6 +510,84 @@ function scanPackageJsonDependencies(nodeModulesPath, compromisedPackages, depth
 
 	return results;
 }
+
+// 疑わしいファイルのチェック（最優先）
+console.log('');
+console.log('='.repeat(70));
+log.title('🔍 疑わしいファイルのチェック');
+console.log('='.repeat(70) + '\n');
+
+const suspiciousFiles = [
+	{ name: 'setup_bun.js', description: 'ドロッパー（マルウェア配布スクリプト）' },
+	{ name: 'bun_environment.js', description: 'メインペイロード（難読化ファイル）' },
+	{ name: 'cloud.json', description: 'クラウド認証情報' },
+	{ name: 'environment.json', description: '環境変数' },
+	{ name: 'actionsSecrets.json', description: 'GitHub Actions シークレット' },
+];
+
+let foundSuspiciousFiles = [];
+
+try {
+	const findFiles = (dir, fileName) => {
+		const results = [];
+		try {
+			const entries = fs.readdirSync(dir, { withFileTypes: true });
+			for (const entry of entries) {
+				const fullPath = path.join(dir, entry.name);
+
+				// node_modules は除外
+				if (entry.name === 'node_modules') continue;
+
+				if (entry.isDirectory()) {
+					results.push(...findFiles(fullPath, fileName));
+				} else if (entry.name === fileName) {
+					results.push(fullPath);
+				}
+			}
+		} catch (error) {
+			// アクセス権限エラーなどは無視
+		}
+		return results;
+	};
+
+	suspiciousFiles.forEach(({ name, description }) => {
+		const found = findFiles(CONFIG.targetDir, name);
+		if (found.length > 0) {
+			foundSuspiciousFiles.push({ name, description, paths: found });
+		}
+	});
+
+	if (foundSuspiciousFiles.length > 0) {
+		log.error(`🚨 ${foundSuspiciousFiles.length} 種類の疑わしいファイルが検出されました！\n`);
+
+		foundSuspiciousFiles.forEach(({ name, description, paths }) => {
+			log.error(`  ⚠️  ${name} (${description})`);
+			paths.forEach((p) => {
+				const relativePath = path.relative(CONFIG.targetDir, p);
+				console.log(`     場所: ${c.yellow}${relativePath}${c.reset}`);
+			});
+			console.log('');
+		});
+
+		console.log(`${c.red}${c.bold}⚠️  これらのファイルはマルウェアの可能性があります！${c.reset}\n`);
+		console.log(`${c.red}${c.bold}   システムが感染している可能性が高いため、即座に対応してください。${c.reset}\n`);
+		console.log('推奨される対応:\n');
+		console.log(`${c.red}1.${c.reset} これらのファイルを即座に削除してください`);
+		console.log(`${c.red}2.${c.reset} すべての認証情報（API キー、トークン、パスワード）をローテーションしてください`);
+		console.log(`${c.red}3.${c.reset} システムの完全なセキュリティ監査を実施してください`);
+		console.log(`${c.red}4.${c.reset} 詳細: ${c.cyan}https://zenn.dev/hand_dot/articles/04542a91bc432e${c.reset}\n`);
+
+		// 結果に追加
+		results.suspiciousFiles = foundSuspiciousFiles;
+	} else {
+		log.success('✅ 疑わしいファイルは検出されませんでした');
+	}
+} catch (error) {
+	log.warning(`⚠️  疑わしいファイルのチェック中にエラーが発生: ${error.message}`);
+}
+
+console.log('');
+log.title('📂 node_modules を検査中（実体およびシンボリックリンク）...');
 
 if (fs.existsSync(paths.nodeModules)) {
 	let checkedCount = 0;
