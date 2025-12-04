@@ -10,21 +10,33 @@
 const fs = require('fs');
 const path = require('path');
 
-const INPUT_FILE = 'npm_black_list.txt';
+const INPUT_DIR = 'blacklists';
 const OUTPUT_CSV = 'compromised_packages.csv';
 const OUTPUT_JSON = 'compromised_packages.json';
 
 console.log('📝 パッケージリスト抽出開始\n');
 
-// ファイルの存在確認
-if (!fs.existsSync(INPUT_FILE)) {
-	console.error(`❌ エラー: ${INPUT_FILE} が見つかりません`);
+// ディレクトリの存在確認
+if (!fs.existsSync(INPUT_DIR)) {
+	console.error(`❌ エラー: ${INPUT_DIR} ディレクトリが見つかりません`);
 	process.exit(1);
 }
 
 // ファイル読み込み
-const content = fs.readFileSync(INPUT_FILE, 'utf8');
-const lines = content.split('\n');
+const files = fs.readdirSync(INPUT_DIR).filter((file) => file.endsWith('.txt'));
+
+if (files.length === 0) {
+	console.error(`❌ エラー: ${INPUT_DIR} ディレクトリに .txt ファイルが見つかりません`);
+	process.exit(1);
+}
+
+let lines = [];
+files.forEach((file) => {
+	const filePath = path.join(INPUT_DIR, file);
+	console.log(`📂 読み込み中: ${file}`);
+	const content = fs.readFileSync(filePath, 'utf8');
+	lines = lines.concat(content.split('\n'));
+});
 
 const packages = [];
 const packageSet = new Set(); // 重複排除用
@@ -35,6 +47,8 @@ const packageSet = new Set(); // 重複排除用
 const pattern1 = /^(@?[\w-]+\/)?([a-z0-9-_.]+)\s+\((v[\d.]+(?:,\s*v[\d.]+)*)\)/i;
 // パターン2: @scope/package または package（バージョンなし）
 const pattern2 = /^(@?[\w-]+\/)?([a-z0-9-_.]+)$/i;
+// パターン3: @scope/package - 1.2.3, 1.2.4 (ハイフン区切り、vなし)
+const pattern3 = /^(@?[\w-]+\/)?([a-z0-9-_.]+)\s+-\s+([\d.]+(?:,\s*[\d.]+)*)/i;
 
 lines.forEach((line, index) => {
 	const trimmedLine = line.trim();
@@ -44,7 +58,7 @@ lines.forEach((line, index) => {
 		return;
 	}
 
-	// パターン1: バージョン情報あり
+	// パターン1: バージョン情報あり (v1.2.3)
 	const match1 = trimmedLine.match(pattern1);
 	if (match1) {
 		const scope = match1[1] || '';
@@ -52,6 +66,24 @@ lines.forEach((line, index) => {
 		const versions = match1[3].split(',').map((v) => v.trim());
 
 		// 重複チェック（パッケージ名のみで判定）
+		if (!packageSet.has(packageName)) {
+			packageSet.add(packageName);
+			packages.push({
+				name: packageName,
+				versions: versions,
+				line: index + 1,
+			});
+		}
+		return;
+	}
+
+	// パターン3: バージョン情報あり (ハイフン区切り)
+	const match3 = trimmedLine.match(pattern3);
+	if (match3) {
+		const scope = match3[1] || '';
+		const packageName = scope + match3[2];
+		const versions = match3[3].split(',').map((v) => v.trim());
+
 		if (!packageSet.has(packageName)) {
 			packageSet.add(packageName);
 			packages.push({
