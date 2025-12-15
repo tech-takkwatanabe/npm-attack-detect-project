@@ -36,10 +36,10 @@ cd npm-attack-detect-project
 
 ```bash
 # 相対パスで指定
-node index.cjs ../my-project
+node index.cjs ../your-project-with-pnpm
 
 # 絶対パスで指定
-node index.cjs /path/to/htdocs/my-project
+node index.cjs /path/to/htdocs/your-project-with-bun
 ```
 
 ## 📁 ファイル構成
@@ -90,9 +90,9 @@ node extract_packages_options.js --keep-first
 node index.cjs [ターゲットディレクトリ]
 
 # 例
-node index.cjs ../my-project
-node index.cjs ../another-project
-node index.cjs /var/www/html/production-site
+node index.cjs ../your-project-with-pnpm
+node index.cjs ../another-project-with-npm
+node index.cjs /var/www/html/production-site-with-yarn
 ```
 
 ## 📊 出力結果の見方
@@ -104,7 +104,7 @@ node index.cjs /var/www/html/production-site
 📊 検査結果サマリー
 ======================================================================
 
-検査対象: /path/to/my-project
+検査対象: /path/to/your-project-with-pnpm
 検査パッケージ数: 573
 
 ✅ プロジェクトは安全です
@@ -118,7 +118,7 @@ node index.cjs /var/www/html/production-site
 📊 検査結果サマリー
 ======================================================================
 
-検査対象: /path/to/my-project
+検査対象: /path/to/your-project-with-pnpm
 検査パッケージ数: 573
 
 🚨 2 件の問題が検出されました
@@ -262,7 +262,7 @@ node extract_packages.cjs
 
 ```bash
 # 検査スクリプトは変更不要
-node index.cjs ../my-project
+node index.cjs ../your-project-with-pnpm
 ```
 
 ## ⚙️ 設定のカスタマイズ
@@ -364,10 +364,10 @@ cd npm-attack-detect-project
 
 ```bash
 # Specify with relative path
-node index.cjs ../my-project
+node index.cjs ../your-project-with-pnpm
 
 # Specify with absolute path
-node index.cjs /path/to/htdocs/my-project
+node index.cjs /path/to/htdocs/your-project-with-pnpm
 ```
 
 ## 📁 File Structure
@@ -393,7 +393,7 @@ npm-attack-detect-project/
 📊 Scan Results Summary
 ======================================================================
 
-Scan target: /path/to/my-project
+Scan target: /path/to/your-project-with-pnpm
 Packages checked: 787
 
 ✅ Project is safe
@@ -407,7 +407,7 @@ Packages checked: 787
 📊 Scan Results Summary
 ======================================================================
 
-Scan target: /path/to/my-project
+Scan target: /path/to/your-project-with-pnpm
 Packages checked: 787
 
 🚨 2 issues detected
