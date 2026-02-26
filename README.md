@@ -9,7 +9,7 @@ Shai-Hulud サプライチェーン攻撃の侵害パッケージを検出する
 
 **⚠️ 重要: このツールは、プロジェクトに「すでにインストールされているパッケージ」が安全かどうかを検証するためのものです。**
 
-[claude.aiチャット](https://claude.ai/chat) に相談して生成されたスクリプトを基本に、独自で作成しました。調整には[Gooogle Antigravity](https://antigravity.google/)を活用しました。
+[claude.aiチャット](https://claude.ai/chat) に相談して生成されたスクリプトを基本に、独自で作成しました。調整には[Google Antigravity](https://antigravity.google/)を活用しました。
 
 ### 主な機能
 
