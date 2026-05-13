@@ -554,7 +554,20 @@ try {
 	};
 
 	suspiciousFiles.forEach(({ name, description }) => {
-		const found = findFiles(CONFIG.targetDir, name);
+		let found = findFiles(CONFIG.targetDir, name);
+
+		// 特定のファイルについては、配下のディレクトリを限定（誤検知防止）
+		found = found.filter((p) => {
+			const relativePath = path.relative(CONFIG.targetDir, p).replace(/\\/g, '/');
+			if (name === 'setup.mjs') {
+				return relativePath === '.claude/setup.mjs' || relativePath === '.vscode/setup.mjs';
+			}
+			if (name === 'router_runtime.js') {
+				return relativePath === '.claude/router_runtime.js';
+			}
+			return true;
+		});
+
 		if (found.length > 0) {
 			foundSuspiciousFiles.push({ name, description, paths: found });
 		}
@@ -838,7 +851,8 @@ if (results.summary.safe) {
 
 	console.log('検出箇所:');
 	console.log(`  ${c.yellow}├─${c.reset} node_modules: ${results.foundInNodeModules.length} 件`);
-	console.log(`  ${c.yellow}└─${c.reset} package.json: ${results.foundInPackageJson.length} 件\n`);
+	console.log(`  ${c.yellow}├─${c.reset} package.json: ${results.foundInPackageJson.length} 件`);
+	console.log(`  ${c.yellow}└─${c.reset} 疑わしいファイル: ${suspiciousIssueCount} 件\n`);
 
 	// 検出されたパッケージの一覧と詳細
 	console.log('検出されたパッケージ詳細:');
