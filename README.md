@@ -6,6 +6,7 @@ Shai-Hulud サプライチェーン攻撃の侵害パッケージを検出する
 
 このツールは、Shai-Hulud サプライチェーン攻撃などで侵害されたnpmパッケージを、プロジェクト内から検出します。
 [Socket.dev](https://socket.dev/blog/shai-hulud-strikes-again-v2) などのセキュリティレポートに基づいたブラックリストを使用して検査を行います。
+また、検出時の対応指針については [GMO Flatt Security株式会社のブログ](https://blog.flatt.tech/entry/mini_shai_hulud_2nd) を参考にしています。
 
 **⚠️ 重要: このツールは、プロジェクトに「すでにインストールされているパッケージ」が安全かどうかを検証するためのものです。**
 
@@ -137,46 +138,63 @@ node index.cjs /var/www/html/production-site-with-yarn
        (親パッケージの可能性: @stoplight/spectral-rulesets)
 ```
 
-## 🆘 脆弱性が検出された場合の対応
-
-### 1. 即座に実施すべきこと
+### 1. 永続化機構の停止と除去（最優先）
+第二波の攻撃では、クレデンシャルの失効を検知してホームディレクトリ(`~/`)を削除する機構が追加されています。**必ずクレデンシャルのローテーションより先に**永続化を解除してください。
 
 ```bash
-# すべての API キー、トークン、パスワードを即座にローテーション
-# - GitHub Personal Access Token
-# - AWS Credentials
-# - API Keys
-# - Database Passwords
-# - その他の機密情報
+# macOS の場合
+launchctl unload ~/Library/LaunchAgents/com.user.gh-token-monitor.plist
+rm -f ~/Library/LaunchAgents/com.user.gh-token-monitor.plist
+
+# Linux の場合
+systemctl --user stop gh-token-monitor
+systemctl --user disable gh-token-monitor
+rm -f ~/.config/systemd/user/gh-token-monitor.service
+
+# 関連ファイルの削除
+rm -rf ~/.config/gh-token-monitor
+rm -f ~/.local/bin/gh-token-monitor.sh
+rm -f .claude/setup.mjs .vscode/setup.mjs .claude/router_runtime.js /tmp/tmp.ts018051808.lock
 ```
 
-### 2. ローカル環境の確認
+### 2. クレデンシャルのローテーション
+永続化の除去を確認した上で、以下のあらゆる機密情報を即座にローテーションしてください。
+
+```bash
+# - GitHub Personal Access Token
+# - AWS Credentials (SSM Parameter Store等も含む)
+# - API Keys
+# - Database Passwords
+```
+
+### 3. ローカル環境の確認
 
 攻撃によって作成された可能性のあるファイルを確認します：
 
 ```bash
 # プロジェクトディレクトリで以下のファイルを検索
-find . -name "setup_bun.js" -o -name "bun_environment.js" -o -name "cloud.json" -o -name "environment.json" -o -name "actionsSecrets.json"
+find . -name "setup_bun.js" -o -name "bun_environment.js" -o -name "setup.mjs" -o -name "gh-token-monitor.sh" -o -name "router_runtime.js" -o -name "cloud.json" -o -name "environment.json" -o -name "actionsSecrets.json"
 ```
 
 **確認すべきファイル：**
 
-| ファイル名 | 説明 |
-|-----------|------|
 | `setup_bun.js` | ドロッパー（マルウェア配布スクリプト） |
 | `bun_environment.js` | メインペイロード（10MB以上の難読化ファイル） |
+| `setup.mjs` | 永続化用スクリプト（`.claude/` または `.vscode/`） |
+| `gh-token-monitor.sh` | GitHub トークン監視スクリプト |
+| `router_runtime.js` | 悪性ランタイム（`.claude/`） |
 | `cloud.json` | AWS/GCP/Azure認証情報が窃取された可能性 |
 | `environment.json` | 環境変数が窃取された可能性 |
 | `actionsSecrets.json` | GitHub Actions シークレットが窃取された可能性 |
 
 **これらのファイルが見つかった場合：**
-1. **即座に削除**してください
+1. **画面上の手順1（永続化停止）**を最優先で実施してください
 2. 対応する認証情報を**すべてローテーション**してください
 3. システムの完全なセキュリティ監査を実施してください
 
-参考: [Zenn - Shai-Hulud攻撃の詳細](https://zenn.dev/hand_dot/articles/04542a91bc432e)
+出典: [Mini Shai-Hulud 第二波の概要と対応指針 - GMO Flatt Security Blog](https://blog.flatt.tech/entry/mini_shai_hulud_2nd)
 
-### 3. プロジェクトのクリーンアップ
+### 4. プロジェクトのクリーンアップ
 
 ```bash
 # プロジェクトディレクトリに移動
@@ -189,7 +207,7 @@ rm -rf node_modules
 npm cache clean --force
 ```
 
-### 4. 依存関係の修正
+### 5. 依存関係の修正
 
 #### オプションA: 親パッケージを削除（推奨）
 ```bash
@@ -216,14 +234,14 @@ pnpm remove @stoplight/spectral-rulesets
 pnpm update @stoplight/spectral-rulesets
 ```
 
-### 5. 再インストール
+### 6. 再インストール
 
 ```bash
 # クリーンな状態から再インストール
 npm install
 ```
 
-### 6. GitHub リポジトリの確認
+### 7. GitHub リポジトリの確認
 
 - GitHubアカウントで "Sha1-Hulud: The Second Coming" という説明のリポジトリがないか確認
 - 不審なリポジトリがあれば即座に削除
@@ -337,6 +355,7 @@ A tool to detect compromised packages from the Shai-Hulud supply chain attack
 
 This tool detects npm packages compromised in supply chain attacks (like Shai-Hulud) within your projects.
 It uses blacklists based on security reports from sources like [Socket.dev](https://socket.dev/blog/shai-hulud-strikes-again-v2).
+The response guidelines are based on the [GMO Flatt Security Blog](https://blog.flatt.tech/entry/mini_shai_hulud_2nd).
 
 **⚠️ IMPORTANT: This tool is designed to verify whether packages "already installed" in your project are safe.**
 
@@ -429,46 +448,63 @@ Detected package details:
        (Likely parent package: @stoplight/spectral-rulesets)
 ```
 
-## 🆘 Response When Vulnerabilities Detected
-
-### 1. Immediate Actions
+### 1. Stop and Remove Persistence (TOP PRIORITY)
+In the second wave, a mechanism was added to delete the home directory (`~/`) upon detecting token revocation. **Persistence MUST be disabled BEFORE rotating credentials.**
 
 ```bash
-# Immediately rotate all API keys, tokens, and passwords
-# - GitHub Personal Access Token
-# - AWS Credentials
-# - API Keys
-# - Database Passwords
-# - Other sensitive information
+# for macOS
+launchctl unload ~/Library/LaunchAgents/com.user.gh-token-monitor.plist
+rm -f ~/Library/LaunchAgents/com.user.gh-token-monitor.plist
+
+# for Linux
+systemctl --user stop gh-token-monitor
+systemctl --user disable gh-token-monitor
+rm -f ~/.config/systemd/user/gh-token-monitor.service
+
+# Remove files
+rm -rf ~/.config/gh-token-monitor
+rm -f ~/.local/bin/gh-token-monitor.sh
+rm -f .claude/setup.mjs .vscode/setup.mjs .claude/router_runtime.js /tmp/tmp.ts018051808.lock
 ```
 
-### 2. Check Local Environment
+### 2. Rotate Credentials
+Only AFTER confirming persistent modules are removed, rotate all sensitive information:
+
+```bash
+# - GitHub Personal Access Token
+# - AWS Credentials (inc. SSM Parameter Store, etc.)
+# - API Keys
+# - Database Passwords
+```
+
+### 3. Check Local Environment
 
 Check for files that may have been created by the attack:
 
 ```bash
 # Search for the following files in your project directory
-find . -name "setup_bun.js" -o -name "bun_environment.js" -o -name "cloud.json" -o -name "environment.json" -o -name "actionsSecrets.json"
+find . -name "setup_bun.js" -o -name "bun_environment.js" -o -name "setup.mjs" -o -name "gh-token-monitor.sh" -o -name "router_runtime.js" -o -name "cloud.json" -o -name "environment.json" -o -name "actionsSecrets.json"
 ```
 
 **Files to check:**
 
-| Filename | Description |
-|----------|-------------|
 | `setup_bun.js` | Dropper (malware distribution script) |
 | `bun_environment.js` | Main payload (obfuscated file over 10MB) |
+| `setup.mjs` | Persistence script (under `.claude/` or `.vscode/`) |
+| `gh-token-monitor.sh` | GitHub token monitoring script |
+| `router_runtime.js` | Malicious runtime (under `.claude/`) |
 | `cloud.json` | AWS/GCP/Azure credentials may have been stolen |
 | `environment.json` | Environment variables may have been stolen |
 | `actionsSecrets.json` | GitHub Actions secrets may have been stolen |
 
 **If these files are found:**
-1. **Delete immediately**
+1. **Follow Step 1 (Stop Persistence)** as the top priority
 2. **Rotate all** corresponding credentials
 3. Conduct a complete security audit of your system
 
-Reference: [Zenn - Shai-Hulud Attack Details](https://zenn.dev/hand_dot/articles/04542a91bc432e)
+Source: [Mini Shai-Hulud 第二波の概要と対応指針 - GMO Flatt Security Blog](https://blog.flatt.tech/entry/mini_shai_hulud_2nd)
 
-### 3. Project Cleanup
+### 4. Project Cleanup
 
 ```bash
 # Navigate to affected project
@@ -481,7 +517,7 @@ rm -rf node_modules
 npm cache clean --force
 ```
 
-### 4. Fix Dependencies
+### 5. Fix Dependencies
 
 #### Option A: Remove Parent Package (Recommended)
 ```bash
@@ -508,14 +544,14 @@ pnpm remove @stoplight/spectral-rulesets
 pnpm update @stoplight/spectral-rulesets
 ```
 
-### 5. Reinstall
+### 6. Reinstall
 
 ```bash
 # Reinstall from clean state
 npm install
 ```
 
-### 6. Check GitHub Repositories
+### 7. Check GitHub Repositories
 
 - Check your GitHub account for repositories with description "Sha1-Hulud: The Second Coming"
 - Delete any suspicious repositories immediately
