@@ -813,12 +813,13 @@ log.title('📊 検査結果サマリー');
 console.log('='.repeat(70) + '\n');
 
 // 結果の集計
-results.summary.totalIssues = results.foundInNodeModules.length + results.foundInPackageJson.length;
+const suspiciousIssueCount = (results.suspiciousFiles || []).reduce((acc, item) => acc + (item.paths?.length || 0), 0);
+results.summary.totalIssues = results.foundInNodeModules.length + results.foundInPackageJson.length + suspiciousIssueCount;
 
 results.summary.safe = results.summary.totalIssues === 0;
 
 // リスクレベルの判定
-if (results.foundInNodeModules.length > 0) {
+if (suspiciousIssueCount > 0 || results.foundInNodeModules.length > 0) {
 	results.summary.criticalLevel = 'critical';
 } else if (results.foundInPackageJson.length > 0) {
 	results.summary.criticalLevel = 'high';
@@ -921,7 +922,7 @@ if (results.summary.safe) {
 	console.log(`   - ${c.yellow}Linux:${c.reset} systemctl --user stop gh-token-monitor`);
 	console.log('   - 以下のファイルを削除:');
 	console.log('     ~/.config/gh-token-monitor, ~/.local/bin/gh-token-monitor.sh');
-	console.log('     .claude/setup.mjs, .vscode/setup.mjs, /tmp/tmp.ts018051808.lock');
+	console.log('     .claude/setup.mjs, .vscode/setup.mjs, .claude/router_runtime.js, /tmp/tmp.ts018051808.lock');
 	console.log('');
 	console.log(`${c.red}${c.bold}2. クレデンシャルのローテーション${c.reset}`);
 	console.log('   永続化解除後に、GitHub トークン、AWS アクセスキー（SSM Parameter Store等含む）、');
