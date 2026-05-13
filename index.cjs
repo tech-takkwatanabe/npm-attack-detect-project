@@ -523,6 +523,9 @@ const suspiciousFiles = [
 	{ name: 'cloud.json', description: 'クラウド認証情報' },
 	{ name: 'environment.json', description: '環境変数' },
 	{ name: 'actionsSecrets.json', description: 'GitHub Actions シークレット' },
+	{ name: 'setup.mjs', description: '永続化用スクリプト（.claude/ または .vscode/）' },
+	{ name: 'gh-token-monitor.sh', description: 'GitHub トークン監視スクリプト' },
+	{ name: 'router_runtime.js', description: '悪性ランタイム（.claude/）' },
 ];
 
 let foundSuspiciousFiles = [];
@@ -570,12 +573,14 @@ try {
 		});
 
 		console.log(`${c.red}${c.bold}⚠️  これらのファイルはマルウェアの可能性があります！${c.reset}\n`);
-		console.log(`${c.red}${c.bold}   システムが感染している可能性が高いため、即座に対応してください。${c.reset}\n`);
+		console.log(`${c.red}${c.bold}   システムが感染している可能性が高いため、以下の「対応手順」を即座に実行してください。${c.reset}\n`);
+		console.log(`${c.yellow}${c.bold}🚨 注意: クレデンシャルを失効させる前に、必ず永続化機構（gh-token-monitor等）を停止させてください。${c.reset}`);
+		console.log(`${c.yellow}   永続化が稼働したままトークンを無効化すると、ホームディレクトリが削除される恐れがあります。${c.reset}\n`);
 		console.log('推奨される対応:\n');
-		console.log(`${c.red}1.${c.reset} これらのファイルを即座に削除してください`);
-		console.log(`${c.red}2.${c.reset} すべての認証情報（API キー、トークン、パスワード）をローテーションしてください`);
+		console.log(`${c.red}1.${c.reset} 画面下の「対応手順 1. 永続化機構の停止と除去」を最優先で実行してください`);
+		console.log(`${c.red}2.${c.reset} 全ての認証情報（AWS, GitHub, API キー等）をローテーションしてください`);
 		console.log(`${c.red}3.${c.reset} システムの完全なセキュリティ監査を実施してください`);
-		console.log(`${c.red}4.${c.reset} 詳細: ${c.cyan}https://zenn.dev/hand_dot/articles/04542a91bc432e${c.reset}\n`);
+		console.log(`${c.red}4.${c.reset} 詳細: ${c.cyan}https://blog.flatt.tech/entry/mini_shai_hulud_2nd${c.reset}\n`);
 
 		// 結果に追加
 		results.suspiciousFiles = foundSuspiciousFiles;
@@ -910,15 +915,27 @@ if (results.summary.safe) {
 	console.log('='.repeat(70) + '\n');
 
 	console.log('推奨される対応手順:\n');
-	console.log(`${c.red}1.${c.reset} すべての API キー、トークン、パスワードを即座にローテーション`);
-	console.log(`${c.red}2.${c.reset} ターゲットディレクトリで以下のコマンドを実行:`);
-	console.log(`   ${c.cyan}cd ${CONFIG.targetDir}${c.reset}`);
-	console.log(`   ${c.cyan}rm -rf node_modules${c.reset}`);
-	console.log(`   ${c.cyan}npm cache clean --force${c.reset}`);
-	console.log(`${c.red}3.${c.reset} package.json から依存関係を削除または更新`);
-	console.log(`${c.red}4.${c.reset} ${c.cyan}npm install${c.reset} で再インストール`);
-	console.log(`${c.red}5.${c.reset} GitHub で 'Sha1-Hulud: The Second Coming' という`);
-	console.log(`   説明のリポジトリがないか確認\n`);
+	console.log(`${c.red}${c.bold}1. 永続化機構の停止と除去（最優先）${c.reset}`);
+	console.log('   トークン失効を検知してホームディレクトリを削除する機構があるため、最初に行う必要があります。');
+	console.log(`   - ${c.yellow}macOS:${c.reset} launchctl unload ~/Library/LaunchAgents/com.user.gh-token-monitor.plist`);
+	console.log(`   - ${c.yellow}Linux:${c.reset} systemctl --user stop gh-token-monitor`);
+	console.log('   - 以下のファイルを削除:');
+	console.log('     ~/.config/gh-token-monitor, ~/.local/bin/gh-token-monitor.sh');
+	console.log('     .claude/setup.mjs, .vscode/setup.mjs, /tmp/tmp.ts018051808.lock');
+	console.log('');
+	console.log(`${c.red}${c.bold}2. クレデンシャルのローテーション${c.reset}`);
+	console.log('   永続化解除後に、GitHub トークン、AWS アクセスキー（SSM Parameter Store等含む）、');
+	console.log('   すべての API キーを即座に更新してください。');
+	console.log('');
+	console.log(`${c.red}${c.bold}3. GitHub ワークフローとアカウントの調査${c.reset}`);
+	console.log('   - .github/workflows/ に不審なファイル（codeql_analysis.yml 等）がないか確認');
+	console.log('   - GitHub で不審なリポジトリ（Mini Shai-Hulud という説明など）がないか確認');
+	console.log('');
+	console.log(`${c.red}${c.bold}4. プロジェクトのクリーンアップ${c.reset}`);
+	console.log(`   cd ${CONFIG.targetDir}`);
+	console.log('   rm -rf node_modules');
+	console.log('   npm cache clean --force');
+	console.log('   ※ インストール時は npm install --ignore-scripts を推奨\n');
 }
 
 // レポートファイルの生成
