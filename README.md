@@ -361,6 +361,7 @@ Created based on scripts generated in consultation with [claude.ai chat](https:/
 ```bash
 git clone https://github.com/tech-takkwatanabe/npm-attack-detect-project.git
 cd npm-attack-detect-project
+node extract_packages.cjs ## Extract compromised package list
 ```
 
 ### 2. Scan Your Project
