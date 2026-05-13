@@ -50,6 +50,7 @@ npm-attack-detect-project/
 ├── extract_packages.cjs                # パッケージリスト抽出スクリプト
 ├── index.cjs                           # 検査スクリプト（メイン）
 ├── blacklists/                        # 侵害パッケージリスト置き場
+│   ├── npm_black_list_20260513.txt    # 侵害パッケージリスト (TanStack攻撃を含む 2026/05/13)
 │   ├── npm_black_list_20251128.txt    # 侵害パッケージリスト (2025/11/28)
 │   └── npm_black_list_20250919.txt    # 侵害パッケージリスト (2025/09/19)
 ├── compromised_packages.csv           # 生成: CSV形式リスト
@@ -314,6 +315,7 @@ const CONFIG = {
 ## 📚 参考リンク
 
 - [Socket.dev - Shai-Hulud Strikes Again](https://socket.dev/blog/shai-hulud-strikes-again-v2)
+- [Socket.dev - TanStack compromised by Mini Shai-Hulud](https://socket.dev/blog/tanstack-npm-packages-compromised-mini-shai-hulud-supply-chain-attack)
 - [GitHub - Shai-Hulud Migration Response](https://github.com/safedep/shai-hulud-migration-response)
 - [npm Security Best Practices](https://docs.npmjs.com/security-best-practices)
 
@@ -378,6 +380,7 @@ npm-attack-detect-project/
 ├── extract_packages.cjs                # Package list extraction script
 ├── index.cjs                           # Scan script (main)
 ├── blacklists/                        # Directory for blacklist files
+│   ├── npm_black_list_20260513.txt    # Compromised package list (inc. TanStack 2026/05/13)
 │   ├── npm_black_list_20251128.txt    # Compromised package list (2025/11/28)
 │   └── npm_black_list_20250919.txt    # Compromised package list (2025/09/19)
 ├── compromised_packages.csv           # Generated: CSV format list
@@ -550,6 +553,7 @@ npm install
 ## 📚 References
 
 - [Socket.dev - Shai-Hulud Strikes Again](https://socket.dev/blog/shai-hulud-strikes-again-v2)
+- [Socket.dev - TanStack compromised by Mini Shai-Hulud](https://socket.dev/blog/tanstack-npm-packages-compromised-mini-shai-hulud-supply-chain-attack)
 - [GitHub - Shai-Hulud Migration Response](https://github.com/safedep/shai-hulud-migration-response)
 - [npm Security Best Practices](https://docs.npmjs.com/security-best-practices)
 
