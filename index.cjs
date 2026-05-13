@@ -969,8 +969,6 @@ try {
 }
 
 console.log('');
-console.log(`${c.blue}詳細情報:${c.reset} https://socket.dev/blog/shai-hulud-strikes-again-v2`);
-console.log('');
 
 // 終了コード
 process.exit(results.summary.safe ? 0 : 1);
