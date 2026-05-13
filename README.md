@@ -30,6 +30,7 @@ Shai-Hulud サプライチェーン攻撃の侵害パッケージを検出する
 ```bash
 git clone https://github.com/tech-takkwatanabe/npm-attack-detect-project.git
 cd npm-attack-detect-project
+node extract_packages.cjs ## 侵害パッケージリストを抽出
 ```
 
 ### 2. プロジェクトの検査
