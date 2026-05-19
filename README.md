@@ -52,6 +52,7 @@ npm-attack-detect-project/
 ├── extract_packages.cjs                # パッケージリスト抽出スクリプト
 ├── index.cjs                           # 検査スクリプト（メイン）
 ├── blacklists/                        # 侵害パッケージリスト置き場
+│   ├── npm_black_list_20260519.txt    # 侵害パッケージリスト (AntV攻撃を含む 2026/05/19)
 │   ├── npm_black_list_20260513.txt    # 侵害パッケージリスト (TanStack攻撃を含む 2026/05/13)
 │   ├── npm_black_list_20251128.txt    # 侵害パッケージリスト (2025/11/28)
 │   └── npm_black_list_20250919.txt    # 侵害パッケージリスト (2025/09/19)
@@ -401,6 +402,7 @@ npm-attack-detect-project/
 ├── extract_packages.cjs                # Package list extraction script
 ├── index.cjs                           # Scan script (main)
 ├── blacklists/                        # Directory for blacklist files
+│   ├── npm_black_list_20260519.txt    # Compromised package list (inc. AntV 2026/05/19)
 │   ├── npm_black_list_20260513.txt    # Compromised package list (inc. TanStack 2026/05/13)
 │   ├── npm_black_list_20251128.txt    # Compromised package list (2025/11/28)
 │   └── npm_black_list_20250919.txt    # Compromised package list (2025/09/19)
